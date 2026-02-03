@@ -1,184 +1,80 @@
 # Routecast
 
-**Intelligent Route Optimization Platform for Local Food Systems**
+Routecast is a data-driven logistics decision-support platform designed to assist local food producers and restaurants with delivery planning and route coordination. The system supports regional food distribution by transforming operational inputs into optimized delivery routes that can be reviewed and executed by human operators.
 
-Routecast is a full-stack logistics platform that connects local farmers with restaurants through optimized delivery routing. Built to strengthen regional food supply chains, it reduces transportation costs, minimizes environmental impact, and provides auditable metrics for sustainable agricultural logistics.
-
----
-
-## 🎯 Problem Statement
-
-Local farms struggle to efficiently deliver produce to multiple restaurant clients. Manual route planning leads to:
-- Excess fuel consumption and CO₂ emissions
-- Longer delivery times affecting produce freshness
-- Difficulty scaling to serve more clients
-- No data-driven insights for operational improvement
+![Route Optimization Interface](docs/images/route-optimizer.png)
 
 ---
 
-## 🚀 Key Features
+## Overview
 
-### Route Optimization Engine
-- **OSRM-Backed Routing**: Integrates with Open Source Routing Machine Table API for accurate, real-world distance and duration matrices
-- **Nearest-Neighbor Algorithm**: Deterministic route ordering that minimizes total travel distance
-- **Haversine Fallback**: Graceful degradation using great-circle distance calculations when OSRM is unavailable
-- **Multi-Stop Planning**: Optimize routes with unlimited delivery stops from a single pickup location
+Small and mid-scale food producers often rely on manual planning to coordinate deliveries to multiple restaurant clients. Routecast supports this planning process by allowing users to define pickup locations, delivery destinations, and accepted produce requests, and then generating optimized route suggestions based on real road-network distance data.
 
-### Farm-to-Restaurant Marketplace
-- **Produce Inventory Management**: Farmers list available produce with pricing, quantities, harvest dates, and organic certifications
-- **Restaurant Request System**: Restaurants submit delivery requests with quantity needs, price limits, and delivery windows
-- **Order Matching**: Sellers review and accept incoming produce requests
-- **External Integration**: Webhook-based integration with Menurithm restaurant management platform
-
-### Delivery Management
-- **Route Lifecycle**: Plan → Active → Completed status tracking for all delivery routes
-- **Saved Routes History**: Complete audit trail of all optimized routes with metrics
-- **Accepted Orders Flow**: Automatically populate route stops from accepted produce requests
-
-### Analytics & Reporting
-- **Demand Analytics**: Track produce request trends, average quantities, and pricing patterns
-- **Route Efficiency Metrics**: Monitor completion rates, average distances, and total miles traveled
-- **Environmental Impact Tracking**: Calculate estimated CO₂ reduction and fuel savings from route optimization
-- **Exportable Reports**: JSON export of metrics for compliance documentation and business analysis
-
-### User Management
-- **Firebase Authentication**: Secure user registration and login with token verification
-- **Role-Based Access**: Distinct seller (farmer) and buyer (restaurant) user types
-- **Profile Management**: Firestore-backed user profiles with compliance documentation fields
+The platform is designed to **support human decision-making**, not to automate logistics execution.
 
 ---
 
-## 🏗️ Architecture
+## Core Capabilities
 
-### Backend (Python/FastAPI)
-- **Framework**: FastAPI with async/await support
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Authentication**: Firebase Admin SDK for token verification
-- **Geocoding**: Mapbox Geocoding API for address resolution
-- **Routing**: OSRM Table API for distance/duration matrices
-
-### Frontend (TypeScript/Preact)
-- **Framework**: Preact with hooks
-- **UI Library**: Material-UI (MUI) components
-- **Maps**: Mapbox GL JS for interactive route visualization
-- **State**: React Context for cross-component state management
-- **Build**: Vite for fast development and optimized production builds
+- Multi-stop delivery route planning from a single pickup location  
+- Route optimization using real road-network distance calculations  
+- Interactive map-based visualization of suggested routes  
+- Integration with produce request and inventory workflows  
+- Historical tracking of planned and completed delivery routes  
 
 ---
 
-## 📊 Technical Highlights
+## Route Planning Workflow
 
-| Metric | Implementation |
-|--------|----------------|
-| Route Optimization | O(n²) nearest-neighbor heuristic with OSRM distance matrix |
-| API Response Time | Sub-second route generation for typical delivery scenarios |
-| Distance Accuracy | OSRM provides road-network distances vs. straight-line estimates |
-| Environmental Calc | ~15% distance savings × 0.404 kg CO₂/mile × route distance |
+1. A producer selects a pickup location and one or more delivery destinations  
+2. Routecast retrieves distance and travel duration data using routing services  
+3. A deterministic optimization heuristic orders delivery stops to reduce total travel distance  
+4. The suggested route is displayed visually for operator review  
+5. Operators may save, reuse, or execute routes based on operational needs  
+
+The screenshot above illustrates a typical route planning scenario with a pickup location and delivery stop rendered on the map interface.
 
 ---
 
-## 🔧 Environment Variables
+## Architecture (High-Level)
 
 ### Backend
-```bash
-DATABASE_URL=postgresql://user:pass@host/database
-ALLOWED_ORIGINS=https://yourfrontend.com
-GEOCODER_API_KEY=your_mapbox_token
-GEOCODER_PROVIDER=mapbox
-OSRM_BASE_URL=https://router.project-osrm.org  # Optional
-```
+- Python-based backend implemented using FastAPI  
+- Structured relational data storage using PostgreSQL and SQLAlchemy  
+- External routing services used for distance and duration calculations  
+- Authentication and access control handled via Firebase token verification  
 
 ### Frontend
-```bash
-VITE_BACKEND_URL=https://yourbackend.com
-VITE_MAP_BOX_API_TOKEN=your_mapbox_token
-VITE_API_KEY=firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=yourapp.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=yourapp.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=sender_id
-VITE_FIREBASE_APP_ID=app_id
-```
+- Web-based client built using TypeScript and Preact  
+- Interactive route visualization using Mapbox GL JS  
+- Role-based user flows for producers and restaurant users  
 
 ---
 
-## 🚀 Getting Started
+## Analytics and Operational Visibility
 
-### Prerequisites
-- Python 3.10+
-- Node.js 18+ / pnpm
-- PostgreSQL database
-- Firebase project
-- Mapbox account
+Routecast records operational data associated with delivery planning, including:
+- Number of delivery stops per route  
+- Estimated travel distance  
+- Route execution history  
 
-### Backend Setup
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env  # Configure environment variables
-make run
-```
-
-### Frontend Setup
-```bash
-cd frontend
-pnpm install
-cp .env.example .env  # Configure environment variables
-pnpm dev
-```
+These records support basic operational analysis and can be exported for reporting or review.
 
 ---
 
-## 📁 Project Structure
+## Integration
 
-```
-routecast/
-├── backend/
-│   ├── app/
-│   │   ├── core/          # Configuration, CORS setup
-│   │   ├── db/            # Database connection, SQLAlchemy
-│   │   ├── models/        # SQLAlchemy models (User, Produce, Route)
-│   │   ├── routes/        # API endpoints
-│   │   ├── schemas/       # Pydantic validation schemas
-│   │   ├── services/      # Business logic (optimizer, geocode)
-│   │   └── utils/         # Auth helpers, config utilities
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── api/           # Backend API clients
-│   │   ├── components/    # Reusable UI components
-│   │   ├── context/       # React Context providers
-│   │   ├── hooks/         # Custom hooks (Firebase, Mapbox)
-│   │   ├── pages/         # Route-level page components
-│   │   └── types/         # TypeScript type definitions
-│   └── package.json
-└── docker-compose.yml
-```
+Routecast is designed to interoperate with food service planning platforms such as **Menurithm**. Accepted produce requests and delivery-related data can be shared between systems through API-based integration, supporting coordinated planning across food preparation and logistics activities.
 
 ---
 
-## 🌱 Impact & Vision
+## Status
 
-Routecast addresses critical inefficiencies in local food distribution:
-
-- **Economic**: Reduces delivery costs through optimized routing, enabling small farms to serve more clients profitably
-- **Environmental**: Quantifiable reduction in transportation emissions through shorter, smarter routes
-- **Food Security**: Strengthens regional supply chains by making farm-to-restaurant logistics scalable
-- **Data-Driven**: Provides analytics that help farmers and restaurants make informed operational decisions
+This repository contains an actively developed implementation of the Routecast platform. The system is designed for real-world operational use and ongoing iterative refinement.
 
 ---
 
-## 📄 License
-
-Apache 2.0 License – see [LICENSE](./LICENSE)
-
----
-
-## 👤 Author
+## Author
 
 **Brian Mbeere**  
-Full-Stack Software Engineer specializing in agricultural technology and logistics optimization.
-
-Built as a demonstration of expertise in scalable web applications, API design, and real-world problem solving for local food systems.
+Software Engineer focused on data-driven decision-support systems for food operations and logistics planning.
