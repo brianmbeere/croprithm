@@ -193,7 +193,7 @@ this repository's `main` branch with the static settings in
 https://routecast-core.onrender.com. Live Render settings match the YAML;
 changing YAML alone does not attach a manually created site to Blueprint sync.
 
-The API now connects to the **Menurithm Postgres instance** with
+The API now connects to **`shared-pilot-postgres`** with
 `DB_NAME=routecast`, a URL ending in `/routecast`, and the dedicated
 `routecast_api` login. Its pool is explicitly set to 2 retained connections,
 1 overflow, a 30-second timeout and 1800-second recycling. Menurithm remains on
@@ -223,6 +223,32 @@ redirect/OAuth or domain-dependent email-link authentication. The existing local
 Firebase service-account key could not obtain a Google management token; do not
 reuse it for deployment administration. Never put a replacement private key in
 the frontend or commit one to this repository.
+
+#### Shared infrastructure ownership
+
+The retained database instance is now named
+[`shared-pilot-postgres`](https://dashboard.render.com/d/dpg-d1b9okidbo4c73cal3o0-a)
+and belongs to **Shared Infrastructure / Production**, not either application's
+project. Routecast and Menurithm keep their separate app projects and
+GitHub-linked deployments. The original Routecast database and paid frontend
+remain suspended in Routecast's project for rollback.
+
+The shared instance contains the separate `menurithm` and `routecast` logical
+databases. This was only a display-name/project move: the instance ID, existing
+hostnames, credentials and URLs did not change. Keep `DB_NAME=routecast` and the
+`routecast_api` login on this API. Do not substitute the display name for the
+database name or hostname in connection strings.
+
+Shared Infrastructure / Production permits cross-environment private networking,
+as do both app environments. Both APIs continue using their existing internal
+URLs in Oregon. Review both applications before enabling network isolation.
+Keep their database selection and credentials service-specific.
+
+The shared database is intentionally absent from both app repositories'
+static-site Blueprints: it must have one infrastructure owner, not be created or
+managed twice. Future infrastructure-as-code adoption should import the existing
+instance into one dedicated infrastructure definition, not provision a new
+database per app.
 
 ---
 
