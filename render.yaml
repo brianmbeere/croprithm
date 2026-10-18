@@ -15,7 +15,7 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: VITE_BACKEND_URL
-        value: https://routecast-core.onrender.com
+        value: https://api.croprithm.com
       - key: VITE_API_KEY
         sync: false
       - key: VITE_FIREBASE_AUTH_DOMAIN

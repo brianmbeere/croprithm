@@ -18,9 +18,9 @@ GoDaddy DNS records for the Render services:
 Remove conflicting parking A/AAAA records for these hosts only; preserve mail
 and verification records. Add the root domain to the Croprithm static site
 (Render adds its www redirect) and `api.croprithm.com` to the existing API.
-Verify DNS, Render domain verification and HTTPS before changing
-`VITE_BACKEND_URL` to `https://api.croprithm.com` and rebuilding. Until then,
-the existing assigned API hostname above remains a deliberate compatibility URL.
+DNS, Render domain verification and HTTPS have been verified for all three
+custom hostnames. `VITE_BACKEND_URL` now uses `https://api.croprithm.com`.
+The existing assigned API hostname remains a deliberate compatibility URL.
 Renaming a Render service does not change its assigned hostname.
 
 Keep the existing Firebase project `routecast-49fd2`: rename its display name to
@@ -188,7 +188,7 @@ The Preact frontend is a browser-only Vite SPA, not a server-rendered applicatio
 - No start command or Vite preview server
 
 Copy the current frontend's `VITE_*` settings at **build time**, keeping
-`VITE_BACKEND_URL=https://routecast-core.onrender.com`, Firebase web configuration,
+`VITE_BACKEND_URL=https://api.croprithm.com`, Firebase web configuration,
 and the public Mapbox token (`VITE_MAP_BOX_API_TOKEN`, starting with `pk.`).
 Changing build variables requires a rebuild. Required configuration, HTTPS API
 URLs and the public Mapbox token are validated during production builds. For a
@@ -196,7 +196,7 @@ local production build with localhost development settings:
 
 ```bash
 cd frontend
-VITE_BACKEND_URL=https://routecast-core.onrender.com npm run build
+VITE_BACKEND_URL=https://api.croprithm.com npm run build
 ```
 
 All `VITE_*` settings are public browser configuration. Do not copy database
@@ -227,10 +227,11 @@ backup checksums and active applications were verified.
 
 #### Verified live layout (2026-10-18)
 
-The active frontend is https://croprithm.onrender.com, deploying from
+The active frontend is https://croprithm.com (also https://croprithm.onrender.com), deploying from
 this repository's `main` branch with the static settings in
-[`render.yaml`](render.yaml). The existing API URL remains
-https://routecast-core.onrender.com. Live Render settings match the YAML;
+[`render.yaml`](render.yaml). The public API is https://api.croprithm.com;
+https://routecast-core.onrender.com remains a compatibility hostname.
+Live Render settings match the YAML;
 changing YAML alone does not attach a manually created site to Blueprint sync.
 
 The API now connects to **`shared-pilot-postgres`** with
