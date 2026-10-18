@@ -263,12 +263,11 @@ deletion, but do not track newer writes. Recovery into another instance requires
 provisioning a target and restoring a backup; pause writers and reconcile current
 data instead of overwriting newer writes with a stale cutover dump.
 
-Firebase's public configuration did not yet show `croprithm.com`,
-`www.croprithm.com` or `croprithm.onrender.com` in `routecast-49fd2` authorized
-domains at verification time, despite the reported console update. Confirm the
-saved settings in this specific project (number `589507409368`). Existing
-email/password sign-in was user-accepted; add the domain before using
-redirect/OAuth or domain-dependent email-link authentication. The existing local
+Firebase's public configuration now confirms `croprithm.com`,
+`www.croprithm.com` and `croprithm.onrender.com` as authorized domains in the
+existing `routecast-49fd2` project (number `589507409368`). Existing accounts
+and project identity are retained. Provider-specific OAuth and email-link flows
+still require their own end-to-end sign-in checks. The existing local
 Firebase service-account key could not obtain a Google management token; do not
 reuse it for deployment administration. Never put a replacement private key in
 the frontend or commit one to this repository.
