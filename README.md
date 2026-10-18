@@ -139,7 +139,7 @@ migrations and backups on direct port 5432.
 ### Free static frontend
 
 The Preact frontend is a browser-only Vite SPA, not a server-rendered application.
-[`render.yaml`](render.yaml) defines a free static site named `routecast-static`:
+[`render.yaml`](render.yaml) defines a free static site named `routecast`:
 
 - Root directory: `frontend`
 - Build: `npm ci --include=dev && npm run build`
@@ -163,16 +163,16 @@ All `VITE_*` settings are public browser configuration. Do not copy database
 credentials, Firebase Admin keys, Mapbox secret tokens or service API keys into
 the static site's environment.
 
-Add `https://routecast-static.onrender.com` to the backend's **`ALLOWED_ORIGINS`**,
-retaining the old origin during staging. Add `routecast-static.onrender.com` to
+Set the backend's **`ALLOWED_ORIGINS`** to `https://routecast.onrender.com`.
+Add `routecast.onrender.com` to
 Firebase Authentication's authorized domains and any API-key referrer
 restrictions; allow the new origin in the public Mapbox token's URL restrictions.
 Verify maps, sign-in, API calls and direct `/signin` and `/dashboard` navigation
 before suspending the old paid frontend.
 
-The new site uses `routecast-static.onrender.com`; the old service's
-`routecast.onrender.com` hostname does not automatically transfer or redirect
-when suspended. Update links/bookmarks or move a custom domain after verification.
+The static site uses `routecast.onrender.com`, reclaimed after deleting the old
+paid web service. The temporary `routecast-static.onrender.com` staging site is
+retired and does not redirect. Use the clean URL in links and bookmarks.
 Static sites avoid a monthly compute charge, but workspace bandwidth and build
 minutes can still be billed. Do not create a duplicate site by applying a new
 Blueprint to a manually created resource without reconciling/importing it.
@@ -187,7 +187,7 @@ backup checksums and active applications were verified.
 
 #### Verified live layout (2026-10-18)
 
-The active frontend is https://routecast-static.onrender.com, deploying from
+The active frontend is https://routecast.onrender.com, deploying from
 this repository's `main` branch with the static settings in
 [`render.yaml`](render.yaml). The existing API URL remains
 https://routecast-core.onrender.com. Live Render settings match the YAML;
@@ -212,14 +212,14 @@ of compute plus the old database's allocated storage charges were removed at
 current published rates. The active shared instance and logical databases are
 unchanged.
 
-The old `routecast.onrender.com` frontend is unavailable, not redirected. The
+The clean `routecast.onrender.com` URL now serves the free static frontend. The
 deleted database's Render-managed recovery history is no longer available.
 Private PostgreSQL 16 cutover dumps remain, with checksums verified before
 deletion, but do not track newer writes. Recovery into another instance requires
 provisioning a target and restoring a backup; pause writers and reconcile current
 data instead of overwriting newer writes with a stale cutover dump.
 
-Firebase's public configuration did not yet show `routecast-static.onrender.com`
+Firebase's public configuration did not yet show `routecast.onrender.com`
 in `routecast-49fd2` authorized domains at verification time. Existing
 email/password sign-in was user-accepted; add the domain before using
 redirect/OAuth or domain-dependent email-link authentication. The existing local

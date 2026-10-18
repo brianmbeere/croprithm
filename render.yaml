@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: routecast-static
+    name: routecast
     runtime: static
     rootDir: frontend
     buildCommand: npm ci --include=dev && npm run build
