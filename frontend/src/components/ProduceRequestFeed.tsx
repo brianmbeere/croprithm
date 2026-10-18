@@ -22,6 +22,7 @@ const ProduceRequestFeed = () => {
       setError(null);
       const data = await produceRequestApi.getRequests({
         status: 'pending',
+        legacy_only: true,
         limit: 50
       });
       setRequests(data);
@@ -125,7 +126,8 @@ const ProduceRequestFeed = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" gutterBottom>Produce Requests</Typography>
+        <Typography variant="h5" gutterBottom>Legacy produce requests</Typography>
+        <Alert severity="info" sx={{ mb: 2 }}>Historical requests use the original workflow. New customer pickup and farmer delivery requests are managed in Orders & handovers.</Alert>
         <Button onClick={loadRequests} variant="outlined" size="small">
           Refresh
         </Button>
@@ -144,7 +146,7 @@ const ProduceRequestFeed = () => {
               const canAccept = req.status === 'pending' && !req.assigned_seller_id;
               
               return (
-                <Grid sx={{ xs: 12, md: 6 }} key={req.id}>
+                <Grid size={{ xs: 12, md: 6 }} key={req.id}>
                   <Card 
                     variant={isSelected ? "outlined" : undefined} 
                     sx={{ 

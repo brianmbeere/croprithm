@@ -244,6 +244,8 @@ export const produceRequestApi = {
   async getRequests(params?: {
     status?: string;
     produce_type?: string;
+    delivery_only?: boolean;
+    legacy_only?: boolean;
     skip?: number;
     limit?: number;
   }): Promise<ProduceRequest[]> {

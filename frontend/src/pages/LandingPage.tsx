@@ -9,7 +9,7 @@ const LandingPage: FunctionalComponent = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        background: `linear-gradient(120deg, ${brandPalette.background.default} 0%, ${brandPalette.accent.main} 100%)`,
+        background: brandPalette.background.default,
         color: brandPalette.text.primary,
         display: "flex",
         flexDirection: "column",
@@ -26,7 +26,7 @@ const LandingPage: FunctionalComponent = () => {
           zIndex: 1000,
           backgroundColor: brandPalette.background.paper,
           borderBottom: `1px solid ${brandPalette.accent.main}`,
-          px: 3,
+          px: { xs: 2, md: 4 },
           py: 2,
           display: "flex",
           justifyContent: "space-between",
@@ -34,7 +34,7 @@ const LandingPage: FunctionalComponent = () => {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box component="img" src={logoLanding} alt="Croprithm Logo" sx={{ height: 48, width: "auto", background: "transparent" }} />
+          <Box component="img" src={logoLanding} alt="Croprithm Logo" sx={{ height: { xs: 30, md: 42 }, maxWidth: { xs: 140, md: 220 }, background: "transparent" }} />
         </Box>
         <Button
           variant="contained"
@@ -63,17 +63,13 @@ const LandingPage: FunctionalComponent = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7 }}
         >
-          <Box
-            component="img"
-            src={logoLanding}
-            alt="Connecting Farms to Tables"
-            sx={{ width: "100%", maxWidth: 500, mx: "auto", mb: 3 }}
-          />
+          <Typography variant="overline" color="primary">From your farm. On your terms.</Typography>
+          <Typography variant="h1" sx={{ my: 3 }}>Good produce deserves<br />a better handover.</Typography>
           <Typography variant="h6" color={brandPalette.text.secondary} sx={{ maxWidth: 600, mx: "auto" }}>
-            Croprithm connects farmers, restaurants, and local markets with optimized, sustainable delivery routes. Reduce waste, save fuel, and deliver fresher produce faster.
+            Manage your harvest, quote farmer delivery or customer pickup, and keep every handover clear. Built for farmers who care about the condition their produce arrives in.
           </Typography>
           <Button variant="contained" size="large" href="/signin" sx={{ mt: 4, background: brandPalette.primary.main, color: brandPalette.primary.contrastText, fontWeight: 700, borderRadius: 2, px: 4, fontSize: 20, boxShadow: "0 2px 8px rgba(58,131,116,0.08)", ':hover': { background: brandPalette.secondary.main, color: brandPalette.secondary.contrastText } }}>
-            Start Planning
+            Open farmer workspace
           </Button>
         </motion.div>
       </Container>
@@ -86,19 +82,19 @@ const LandingPage: FunctionalComponent = () => {
         <Grid container spacing={4}>
           {[
             {
-              title: "🚚 Optimized Farm-to-Table Delivery",
-              desc: "Coordinate pickups and delivery stops between farms, markets, and restaurants with suggested stop ordering.",
+              title: "Choose the right handover",
+              desc: "Offer customer pickup with no delivery fee, or deliver it yourself. Quote the terms and wait for customer approval.",
             },
             {
-              title: "🌱 Reduce Waste, Boost Profit",
-              desc: "Smart routing means less spoilage, fewer empty miles, and more revenue for every stakeholder in the supply chain.",
+              title: "Keep your harvest in view",
+              desc: "Manage produce availability and quality details in your farmer inventory. Keep customers informed as orders become ready.",
             },
             {
-              title: "📦 Plan Here, Navigate with Maps",
+              title: "Plan here. Navigate with Maps.",
               desc: "Save delivery stops, open Google Maps or Apple Maps for directions, and return to record progress. No dedicated navigation app required.",
             },
           ].map((feature, index) => (
-            <Grid key={index} sx={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid key={index} size={{ xs: 12, md: 4 }}>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}

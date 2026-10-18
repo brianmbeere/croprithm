@@ -6,6 +6,7 @@ import logging
 from app.db.database import get_db
 from app.models.produce import DeliveryRoute, DeliveryStop, ProduceRequest
 from app.models.user import User
+from app.models.fulfillment import FulfillmentAgreement
 from app.schemas.produce import (
     DeliveryRouteCreate, 
     DeliveryRouteResponse,
@@ -46,6 +47,16 @@ async def create_route_from_requests(
     
     if len(requests) != len(route_data.request_ids):
         raise HTTPException(status_code=400, detail="All requests must be accepted and assigned to you")
+
+    agreements = db.query(FulfillmentAgreement).filter(
+        FulfillmentAgreement.request_id.in_(route_data.request_ids)
+    ).all()
+    if any(
+        item.method != "farmer_delivery" or item.accepted_revision != item.revision
+        or item.stage not in ["accepted", "ready"]
+        for item in agreements
+    ):
+        raise HTTPException(409, "Only customer-approved farmer delivery orders can be scheduled")
 
     scheduled = db.query(DeliveryStop).join(DeliveryRoute).filter(
         DeliveryStop.request_id.in_(route_data.request_ids),

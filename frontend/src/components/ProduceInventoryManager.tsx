@@ -219,7 +219,7 @@ const ProduceInventoryManager = () => {
       ) : (
         <Grid container spacing={2}>
           {inventory.map((item) => (
-            <Grid sx={{ xs: 12, md: 6, lg: 4 }} key={item.id}>
+            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={item.id}>
               <Card>
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="flex-start">
@@ -315,7 +315,7 @@ const ProduceInventoryManager = () => {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Produce Type"
@@ -324,7 +324,7 @@ const ProduceInventoryManager = () => {
                 required
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Variety (optional)"
@@ -332,7 +332,7 @@ const ProduceInventoryManager = () => {
                 onChange={(e) => setFormData({ ...formData, variety: (e.target as HTMLInputElement).value })}
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Quantity Available"
@@ -342,7 +342,7 @@ const ProduceInventoryManager = () => {
                 required
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Unit"
@@ -351,7 +351,7 @@ const ProduceInventoryManager = () => {
                 required
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Price per Unit ($)"
@@ -361,7 +361,7 @@ const ProduceInventoryManager = () => {
                 required
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Location"
@@ -370,7 +370,7 @@ const ProduceInventoryManager = () => {
                 required
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Harvest Date"
@@ -380,7 +380,7 @@ const ProduceInventoryManager = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Expiry Date"
@@ -390,7 +390,7 @@ const ProduceInventoryManager = () => {
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid sx={{ xs: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 label="Description (optional)"
@@ -400,7 +400,7 @@ const ProduceInventoryManager = () => {
                 onChange={(e) => setFormData({ ...formData, description: (e.target as HTMLInputElement).value })}
               />
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormControl>
                 <FormLabel>Organic</FormLabel>
                 <Switch
@@ -409,7 +409,7 @@ const ProduceInventoryManager = () => {
                 />
               </FormControl>
             </Grid>
-            <Grid sx={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <FormControl>
                 <FormLabel>Available for Sale</FormLabel>
                 <Switch

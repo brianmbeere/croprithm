@@ -71,7 +71,7 @@ const RoutePlanner: FunctionalComponent = () => {
     try {
       setLoadingOrders(true);
       setOrdersError(null);
-      const orders = await produceRequestApi.getRequests({ status: "accepted" });
+      const orders = await produceRequestApi.getRequests({ status: "accepted", delivery_only: true });
       setAcceptedOrders(orders);
       // Auto-select all accepted orders by default
       setSelectedOrderIds(new Set(orders.map(o => o.id)));
@@ -273,7 +273,7 @@ const RoutePlanner: FunctionalComponent = () => {
           </Box>
         ) : acceptedOrders.length === 0 ? (
           <Alert severity="info">
-            No accepted orders found. Accept produce requests from the Request Feed to see them here.
+            No approved delivery orders yet. Quote farmer delivery in Orders & handovers and wait for customer approval. Pickup orders do not appear here.
           </Alert>
         ) : (
           <Box sx={{ maxHeight: 200, overflowY: "auto" }}>

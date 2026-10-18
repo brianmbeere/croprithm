@@ -15,6 +15,7 @@ const SignInForm: FunctionalComponent = () => {
   const navigate = useNavigate();
 
   const handleSignIn = async () => {
+    setError('');
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -47,13 +48,17 @@ const SignInForm: FunctionalComponent = () => {
           boxShadow: '0 8px 30px rgba(0,0,0,0.05)',
         }}
       >
-        <Typography variant="h5" fontWeight="bold" align="center" gutterBottom>
-          Sign In
+        <Typography variant="overline" color="primary">Croprithm farmer workspace</Typography>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
+          Welcome back
         </Typography>
-        <Box component="form" display="flex" flexDirection="column" gap={2} noValidate>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>Your harvest, orders and handovers in one place.</Typography>
+        <Box component="form" onSubmit={event => { event.preventDefault(); void handleSignIn(); }} display="flex" flexDirection="column" gap={2}>
           <TextField
             label="Email"
             type="email"
+            required
+            autoComplete="email"
             value={email}
             onChange={e => setEmail((e.target as HTMLInputElement)?.value || '')}
             fullWidth
@@ -61,6 +66,8 @@ const SignInForm: FunctionalComponent = () => {
           <TextField
             label="Password"
             type="password"
+            required
+            autoComplete="current-password"
             value={password}
             onChange={e => setPassword((e.target as HTMLInputElement)?.value || '')}
             fullWidth
@@ -68,7 +75,7 @@ const SignInForm: FunctionalComponent = () => {
           {error && <Typography color="error">{error}</Typography>}
           <Button
             variant="contained"
-            onClick={handleSignIn}
+            type="submit"
             fullWidth
             size="large"
             disabled={loading}

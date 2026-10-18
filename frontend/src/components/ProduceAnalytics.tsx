@@ -98,7 +98,7 @@ const ProduceAnalytics = () => {
       {/* Market Overview */}
       {marketInsights && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid sx={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
                 <Typography variant="h4" color="primary">
@@ -110,7 +110,7 @@ const ProduceAnalytics = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid sx={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
                 <Typography variant="h4" color="primary">
@@ -122,7 +122,7 @@ const ProduceAnalytics = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid sx={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
                 <Typography variant="h4" color="warning.main">
@@ -134,7 +134,7 @@ const ProduceAnalytics = () => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid sx={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
                 <Typography variant="h4" color="info.main">
@@ -161,7 +161,7 @@ const ProduceAnalytics = () => {
       ) : (
         <Grid container spacing={2}>
           {demandData.map((item) => (
-            <Grid sx={{ xs: 12, md: 6, lg: 4 }} key={item.produce_type}>
+            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={item.produce_type}>
               <Card>
                 <CardContent>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
@@ -204,7 +204,7 @@ const ProduceAnalytics = () => {
           
           <Grid container spacing={2}>
             {marketInsights.top_requested_produce.slice(0, 6).map((item) => (
-              <Grid sx={{ xs: 12, md: 6, lg: 4 }} key={item.produce_type}>
+              <Grid size={{ xs: 12, md: 6, lg: 4 }} key={item.produce_type}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>

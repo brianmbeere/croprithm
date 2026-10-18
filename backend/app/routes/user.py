@@ -19,14 +19,14 @@ def get_db():
 router = APIRouter(prefix="/users", tags=["users"])
 
 # Create a user
-@router.post("/users", response_model=UserResponse)
+@router.post("/", response_model=UserResponse)
+@router.post("/users", response_model=UserResponse, include_in_schema=False)
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
     firebase_user: dict = Depends(verify_firebase_token)  # 👈 Firebase user injected here
 ):
     firebase_uid = firebase_user["uid"]
-    print("User....", user)
     existing = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
@@ -36,10 +36,8 @@ def create_user(
         email=user.email,
         full_name=user.full_name,
         organization=user.organization,
-        title=user.title,
         country=user.country,
-        use_case=user.use_case,
-        linkedin=user.linkedin
+        role=user.role,
     )
     db.add(new_user)
     db.commit()

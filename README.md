@@ -1,12 +1,72 @@
 # Croprithm
 
+## Farmer fulfillment pilot
+
+The refreshed interface uses the logo's `#3A8374` green for primary actions
+and selection accents, with readable contrasting text and neutral surfaces.
+
+New orders use **customer pickup** or **farmer delivery**, not third-party
+dispatch. Customers create requests in Menurithm's **Produce orders** workspace
+(also accessible from inventory and service integrations). Farmers quote them
+in Croprithm's **Orders & handovers**. Farmers choose the method they can offer,
+provide handover instructions and a USD delivery fee. Pickup requires a pickup
+address and a zero delivery fee. Delivery requires the customer's address.
+The customer's requested timezone-aware window is retained in the agreement.
+
+The customer reviews the farmer contact, method, location, instructions, window
+and delivery fee, checks an explicit agreement box and accepts that quote
+revision. Revised unaccepted quotes require fresh acceptance; stale revisions
+are rejected. Accepted terms are locked against further editing.
+This agrees **delivery terms only**: produce pricing, availability and all
+payments must be arranged directly. No payment is collected in either app.
+Inventory is still managed manually; a request does not reserve or deduct stock.
+
+Stages: requested → quoted → accepted → ready → collected (pickup) or delivered
+(farmer delivery). Only the assigned farmer can record handover.
+Customers refresh their orders to see updates, with no unreliable callback
+dependency between the apps. Farmer confirmation is not customer proof of receipt.
+
+New pickup orders and unapproved delivery quotes cannot enter delivery routes.
+Historical requests remain in **Legacy requests** with their original behavior.
+Existing routes and database rows are not reinterpreted or migrated.
+Route stop progress remains separate: finish the actual handover in
+**Orders & handovers**, even if you have marked a route stop delivered.
+
+### Backend setup and deployment order
+
+1. Back up the Croprithm logical database (internally named `routecast`).
+2. From `backend`, with its own `DATABASE_URL` / `DB_NAME`, run
+   `python migrate_fulfillment.py`. This idempotently creates only the new
+   `fulfillment_agreements` table; it does not modify existing order columns
+   or the Menurithm logical database. `create_all` is not a column migration.
+3. Generate a strong random `FULFILLMENT_BRIDGE_KEY`. Set the **same value only
+   on both API services**, never in a `VITE_*` variable, Git or browser storage.
+   Menurithm proxies authenticated users with their server-derived Firebase UID
+   and email. Croprithm namespaces those identities separately from its own users.
+4. Deploy the Croprithm API, then Menurithm API, then both static frontends.
+   The bridge uses the origin of `CROPRITHM_BASE_URL` with `/api/fulfillment`;
+   legacy `/api/v1` suffixes are not appended. An unconfigured bridge returns 503,
+   never a pretend demo order. Keep bounded database pools unchanged.
+5. Rollback: revert application deployment, retaining the additive table and its
+   agreements. Do not drop pilot order data. Legacy status APIs reject agreement
+   orders to prevent bypassing customer approval.
+
+Run `python -m unittest test_fulfillment test_delivery_workflow test_database_config -q`
+from the backend. The dev-only `/tests/fulfillment.html` frontend fixture checks
+farmer quoting without credentials or real orders; the Menurithm counterpart
+checks customer request/approval and responsive navigation. Neither is bundled.
+Physical-device validation remains open in issue 22. Cancellation/reassignment,
+stock reservations, produce checkout, notifications and dedicated driver
+operations are future work in issue 28.
+
 ## Mobile-web delivery pilot
 
 Croprithm handles delivery planning and operator-confirmed progress. Google Maps
 and Apple Maps handle turn-by-turn navigation; no native mobile app, embedded
 navigation SDK, background GPS or automatic proof of delivery is provided.
 
-1. Accept produce requests, then open Route Planner.
+1. Obtain customer approval for a farmer delivery quote (or accept a legacy
+   request), then open Route Planner.
 2. Select accepted orders, choose **Use Selected as Stops**, and enter a pickup
    and route name. **Generate Route** shows an unsaved preview (manual addresses
    also work). **Save selected orders for delivery** optimizes and saves today's

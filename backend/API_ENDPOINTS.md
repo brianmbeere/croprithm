@@ -11,6 +11,38 @@ Authorization: Bearer <firebase_id_token>
 
 ## API Endpoints
 
+### Pickup and farmer delivery agreements
+
+Run `python migrate_fulfillment.py` before deploying this workflow.
+All routes below are rooted at `/api/fulfillment`.
+
+| Method | Path | Access / behavior |
+| --- | --- | --- |
+| POST | `/orders` | Customer: create request with method `customer_pickup` or `farmer_delivery`, quantity/unit, customer name, timezone-aware window start/end, optional requirements, delivery address when delivering |
+| GET | `/orders` | Customer's own orders and current agreement terms only |
+| POST | `/orders/{id}/accept` | Customer: `{"revision": 1}` accepts exact quote; stale revision returns 409 |
+| GET | `/farmer/orders` | Farmer: unassigned and own orders |
+| PUT | `/farmer/orders/{id}/quote` | Farmer: method, decimal-string `fee`, `currency: "USD"`, pickup address, instructions, `expected_revision` |
+| PUT | `/farmer/orders/{id}/stage` | Assigned farmer: `{"stage": "ready"}`, then `collected` for pickup or `delivered` for delivery |
+
+`id` in these routes is the **agreement ID**, not `request_id`. Both are
+returned. Terms include `revision`, `accepted_revision`, `accepted_at`,
+farmer/customer contact, fee as a decimal string, method and handover stage.
+No produce price or payment collection is implied by a delivery quote.
+Fees reject negatives, non-finite values and more than two decimal places.
+Pickup requires an address and zero fee. Accepted terms cannot be edited.
+
+Native customers use Croprithm restaurant Firebase tokens. Menurithm's backend
+uses `Authorization: Bearer <FULFILLMENT_BRIDGE_KEY>` with a server-derived
+`X-Customer-Id`. Its users are namespaced and never require cross-project token
+trust. Only server-to-server code may possess the shared key. Unconfigured
+bridge access does not bypass Firebase authentication.
+
+`GET /api/requests?delivery_only=true` excludes new pickup/unapproved agreements.
+`legacy_only=true` returns historical orders for the legacy request feed.
+Legacy status/delivery updates reject agreement orders with 409. Route creation
+independently enforces approved farmer-delivery eligibility.
+
 ### Mobile delivery pilot: saved progress
 
 `GET /api/routes/{route_id}/stops` returns saved delivery stops in `stop_order`.

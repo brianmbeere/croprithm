@@ -5,12 +5,12 @@ import { createTheme } from "@mui/material/styles";
 
 export const brandPalette = {
   primary: {
-    main: "#3A8374", // Teal green from truck/map icon
-    contrastText: "#FFFFFF",
+    main: "#3A8374",
+    contrastText: "#000000",
   },
   secondary: {
-    main: "#60B393", // Soft green used for CROPRITHM text
-    contrastText: "#1F3E37",
+    main: "#365D54",
+    contrastText: "#FFFFFF",
   },
   accent: {
     main: "#A4D8C2", // Light mint for hover or highlight
@@ -21,30 +21,30 @@ export const brandPalette = {
     contrastText: "#FAFAFA",
   },
   background: {
-    default: "#F8FAF9", // Light background similar to logo background
+    default: "#F4F6F3",
     paper: "#FFFFFF",
   },
   text: {
     primary: "#1F3E37", // Deep greenish text color
-    secondary: "#3A8374", // Teal for highlights or headings
+    secondary: "#53645F",
     disabled: "#A0A0A0",
   },
   error: {
-    main: "#E57373", // Standard material red
+    main: "#B42318",
     contrastText: "#FFFFFF",
   },
   warning: {
-    main: "#FFB74D",
+    main: "#925C13",
     contrastText: "#1F3E37",
   },
   success: {
-    main: "#60B393", // Echoes the logo green
+    main: "#206451",
     contrastText: "#FFFFFF",
   },
 };
 
 
-export const theme = createTheme({
+const baseTheme = createTheme({
   palette: {
     mode: "light",
     primary: brandPalette.primary,
@@ -182,5 +182,45 @@ export const theme = createTheme({
         },
       },
     },
+  },
+});
+
+export const theme = createTheme(baseTheme, {
+  shape: { borderRadius: 12 },
+  typography: {
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    h1: { fontSize: 'clamp(2.4rem, 6vw, 4.6rem)', fontWeight: 750, lineHeight: 1.08, letterSpacing: '-0.045em' },
+    h2: { fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, letterSpacing: '-0.035em' },
+    h3: { fontSize: 'clamp(1.75rem, 3vw, 2.5rem)', fontWeight: 700 },
+    h4: { fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', fontWeight: 700, letterSpacing: '-0.025em' },
+    h5: { fontSize: '1.35rem', fontWeight: 700 },
+    h6: { fontSize: '1.1rem', fontWeight: 650 },
+    body1: { lineHeight: 1.65, color: 'inherit' }, body2: { lineHeight: 1.6, color: 'inherit' },
+  },
+  components: {
+    MuiCssBaseline: { styleOverrides: {
+      html: { scrollBehavior: 'smooth' },
+      body: { margin: 0 },
+      '*': { boxSizing: 'border-box' },
+      'a, button, input, [tabindex]': { '&:focus-visible': { outline: '3px solid #925C13', outlineOffset: 3 } },
+      '@media (prefers-reduced-motion: reduce)': { '*': { animationDuration: '0.01ms !important', transitionDuration: '0.01ms !important', scrollBehavior: 'auto !important' } },
+    } },
+    MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: {
+      root: { minHeight: 44, borderRadius: 10, padding: '10px 18px', letterSpacing: 0 },
+      containedPrimary: { '&:hover': { backgroundColor: '#4A9686' } },
+      outlinedPrimary: { '&:hover': { backgroundColor: '#E7EFEA' } },
+    } },
+    MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
+    MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' }, elevation1: { boxShadow: '0 2px 12px #173D2D08', border: '1px solid #DFE6E0' } } },
+    MuiCard: { styleOverrides: { root: { borderRadius: 16, boxShadow: '0 2px 12px #173D2D08', border: '1px solid #DFE6E0' } } },
+    MuiCardContent: { styleOverrides: { root: { padding: 24 } } },
+    MuiAppBar: { styleOverrides: { root: { backgroundColor: '#FFFFFF', color: '#1F3E37', boxShadow: 'none', borderRadius: 0, borderBottom: '1px solid #DFE6E0' } } },
+    MuiDrawer: { styleOverrides: { paper: { backgroundColor: '#FFFFFF', color: '#1F3E37', borderRadius: 0, borderRight: '1px solid #DFE6E0' } } },
+    MuiListItemButton: { styleOverrides: { root: { '&.Mui-selected': { backgroundColor: '#3A8374', color: '#000000' } } } },
+    MuiAlert: { styleOverrides: { standardError: { backgroundColor: '#FEF3F2', color: '#912018' }, standardWarning: { backgroundColor: '#FFFAEB', color: '#794C10' } } },
+    MuiTextField: { defaultProps: { variant: 'outlined' } },
+    MuiTableContainer: { styleOverrides: { root: { overflowX: 'auto' } } },
+    MuiTableCell: { styleOverrides: { head: { backgroundColor: '#F4F6F3', color: '#53645F', fontWeight: 650 }, root: { borderColor: '#E5EAE5' } } },
+    MuiTabs: { defaultProps: { variant: 'scrollable', scrollButtons: 'auto' } },
   },
 });

@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 import uvicorn
 from app.core.config import setup_cors
-from app.routes import route, views, user, produce, requests, delivery, webhooks, analytics, menurithm
+from app.routes import route, views, user, produce, requests, delivery, webhooks, analytics, menurithm, fulfillment
 
 app = FastAPI(
     title="Croprithm API",
@@ -24,6 +24,7 @@ app.include_router(delivery.router)
 app.include_router(webhooks.router)
 app.include_router(analytics.router)
 app.include_router(menurithm.router)
+app.include_router(fulfillment.router)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

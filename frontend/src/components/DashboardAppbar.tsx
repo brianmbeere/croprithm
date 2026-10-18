@@ -33,8 +33,7 @@ const DashboardAppBar = ({
   return (
     <Box
       sx={{
-        width: { md: "100%" },
-        ml: { md: "5px" },
+        width: "100%",
         mt: { md: 0 },
         transition: "width 0.2s, margin-left 0.2s",
         display: "flex",
@@ -46,32 +45,31 @@ const DashboardAppBar = ({
         variant="outlined"
         sx={{
           boxShadow: theme.shadows[1],
-          background: `linear-gradient(90deg, ${brandPalette.primary.main} 0%, ${brandPalette.secondary.main} 100%)`,
+          background: brandPalette.background.paper,
           border: 0,
         }}
         elevation={0}
       >
-        <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Toolbar sx={{ display: "flex", justifyContent: "space-between", gap: 1, minHeight: "64px !important" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
             {isMobile && (
-              <IconButton edge="start" onClick={onMenuClick}>
+              <IconButton edge="start" onClick={onMenuClick} aria-label="Open navigation">
                 <MenuIcon />
               </IconButton>
             )}
 
             {/* Dynamic Breadcrumbs */}
-            <Breadcrumbs aria-label="breadcrumb">
+            <Breadcrumbs aria-label="breadcrumb" sx={{ '& ol': { flexWrap: 'nowrap' }, minWidth: 0 }}>
               <MuiLink
                 component={RouterLink}
                 to="/dashboard"
                 underline="hover"
-                sx={{ display: "flex", alignItems: "center", fontWeight: 700, color: brandPalette.primary.contrastText }}
+                sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", fontWeight: 700, color: brandPalette.primary.main }}
               >
                 <HomeIcon />
                 <Box component="span" sx={{ ml: 0.5 }}>Croprithm</Box>
               </MuiLink>
-              <Typography sx={{ color: brandPalette.primary.contrastText }}>/</Typography>
-              <Typography sx={{ color: brandPalette.primary.contrastText, fontWeight: 700 }}>{breadcrumb.title}</Typography>
+              <Typography noWrap sx={{ color: brandPalette.text.primary, fontWeight: 600, maxWidth: { xs: 145, sm: 300 } }}>{breadcrumb.title}</Typography>
             </Breadcrumbs>
           </Box>
 

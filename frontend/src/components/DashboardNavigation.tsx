@@ -11,6 +11,7 @@ import { brandPalette } from "../branding";
 const logo = '/croprithm-icon.svg';
 
 interface DashboardNavigationProps {
+  role: "farmer" | "restaurant";
   activeTab: number;
   setActiveTab: (tab: number) => void;
   isMobile: boolean;
@@ -24,12 +25,13 @@ interface DashboardNavigationProps {
 }
 
 const croprithmSections = [
-  { label: "Produce Requests", icon: (color: string) => <RestaurantIcon style={{ color }} /> },
+  { label: "Orders & handovers", icon: (color: string) => <RestaurantIcon style={{ color }} /> },
   { label: "My Inventory", icon: (color: string) => <InventoryIcon style={{ color }} /> },
   { label: "Route Optimizer", icon: (color: string) => <RequestIcon style={{ color }} /> },
   { label: "Saved Routes", icon: (color: string) => <RouteIcon style={{ color }} /> },
   { label: "Analytics", icon: (color: string) => <AnalyticsIcon style={{ color }} /> },
   { label: "Settings", icon: (color: string) => <DrawerExpandIcon style={{ color }} /> },
+  { label: "Legacy requests", icon: (color: string) => <RestaurantIcon style={{ color }} /> },
 ];
 
 const COLLAPSED_WIDTH = 64;
@@ -45,6 +47,7 @@ const DashboardNavigation = ({
   onLogoClick,
   setExpanded,
   expanded,
+  role,
 }: DashboardNavigationProps) => {
   const toggleDrawer = () => setMobileOpen(!mobileOpen);
   const theme = useTheme();
@@ -76,13 +79,13 @@ const DashboardNavigation = ({
             variant="h6"
             noWrap
             component="a"
-            href="dashboard"
+            href="/dashboard"
             style={{
               marginRight: 8,
               display: 'flex',
               fontFamily: theme.typography.fontFamily as string,
               fontWeight: 700,
-              letterSpacing: '.3rem',
+              letterSpacing: '-.03em',
               color: 'inherit',
               textDecoration: 'none',
               flexGrow: 1,
@@ -98,7 +101,12 @@ const DashboardNavigation = ({
       </Toolbar>
       <Divider />
       <List sx={{ flexGrow: 1 }}>
-        {croprithmSections.map((section, index) => {
+        {(role === "farmer" ? croprithmSections : [
+          { ...croprithmSections[0], label: "Source produce" },
+          { ...croprithmSections[2], label: "Route planning" },
+          croprithmSections[3], { ...croprithmSections[4], label: "Sourcing insights" },
+          croprithmSections[5],
+        ]).map((section, index) => {
           const selected = activeTab === index;
           const iconColor = selected ? brandPalette.primary.contrastText : brandPalette.primary.main;
           return (
@@ -170,6 +178,7 @@ const DashboardNavigation = ({
         </Tooltip>
         <Tooltip title="Expand or Collapse" sx={{ p: expanded ? 2: 1, pb: expanded ? 2 : 1}}>
           <IconButton 
+            aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
             sx={{
               minWidth: 0,
               px: expanded ? 2 : 1,

@@ -1,18 +1,16 @@
 from pydantic import BaseModel, Field
+from typing import Literal
 
 # Pydantic schemas
 class UserCreate(BaseModel):
-    full_name: str = Field(alias="fullName")
-    organization: str | None = Field(default=None)
-    title: str | None = Field(default=None)
-    country: str | None = Field(default=None)
-    use_case: str | None = Field(default=None, alias="useCase")
-    linkedin: str | None = Field(default=None)
+    full_name: str = Field(alias="fullName", min_length=1)
+    organization: str = Field(min_length=1)
+    country: str = Field(min_length=1)
     email: str
     firebase_uid: str
+    role: Literal["farmer", "restaurant"]
 
-    class Config:
-        allow_population_by_field_name = True  # So backend can still refer to full_name
+    model_config = {"populate_by_name": True}
 
 
 class UserResponse(BaseModel):
@@ -21,10 +19,8 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     organization: str
-    title: str
     country: str
-    use_case: str
-    linkedin: str
+    role: str
 
     model_config = {
         "from_attributes": True

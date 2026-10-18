@@ -20,7 +20,7 @@ const schema = yup.object({
   email: yup.string().email("Invalid email").required("Email is required"),
   password: yup.string().min(6, "Password must be at least 6 characters").required("Password is required"),
   organization: yup.string().required("Organization is required"),
-  country: yup.string().oneOf(COUNTRIES, "Select a valid role").required("Country is required"),
+  country: yup.string().oneOf(COUNTRIES, "Select a valid country").required("Country is required"),
   role: yup.string().oneOf(["","farmer", "restaurant"], "Select a valid role").required("Role is required"),
 });
 
@@ -28,32 +28,33 @@ const SignUpForm = () => {
   const {
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({ resolver: yupResolver(schema) });
 
   const navigate = useNavigate();
   const [firebaseError, setFirebaseError] = useState("");
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: yup.InferType<typeof schema>) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
       const idToken = await user.getIdToken();
       const db = getFirestore();
+      const { password: _password, ...profile } = data;
 
       await setDoc(doc(db, "users", user.uid), {
-        ...data,
+        ...profile,
         createdAt: new Date().toISOString(),
       });
 
-      const response = await fetch(`${BASE_URL}/users/`, {
+      const response = await fetch(`${BASE_URL}/api/users/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          ...data,
+          ...profile,
           firebase_uid: user.uid,
         }),
       });
@@ -73,10 +74,11 @@ const SignUpForm = () => {
   };
 
   return (
-    <Container maxWidth="xs">
-      <Paper elevation={3} sx={{ p: 4, mt: 8 }}>
+    <Container maxWidth="sm" sx={{ py: 5 }}>
+      <Paper elevation={1} sx={{ p: { xs: 3, md: 5 } }}>
+        <Typography variant="overline" color="primary">Join Croprithm</Typography>
         <Typography variant="h5" gutterBottom>
-          Sign Up
+          Your farm-to-table workspace
         </Typography>
         <Box component="form" onSubmit={handleSubmit(onSubmit)} display="flex" flexDirection="column" gap={2}>
           <Controller
@@ -96,18 +98,18 @@ const SignUpForm = () => {
             )}
           />
           <Controller
-             name="role"
+             name="country"
              control={control}
              defaultValue=""
              render={({ field }) => (
               <TextField
                 select
-                label=""
+                label="Country"
                 fullWidth
                 SelectProps={{ native: true }}
                 {...field}
-                error={!!errors.role}
-                helperText={errors.role?.message}
+                error={!!errors.country}
+                helperText={errors.country?.message}
               > 
                 <option value="">Select a country</option>
                   {COUNTRIES.map((c) => (
@@ -139,7 +141,7 @@ const SignUpForm = () => {
             render={({ field }) => (
               <TextField
                 select
-                label=""
+                label="Account type"
                 fullWidth
                 SelectProps={{ native: true }}
                 {...field}
@@ -154,8 +156,8 @@ const SignUpForm = () => {
           />
 
           {firebaseError && <Typography color="error">{firebaseError}</Typography>}
-          <Button type="submit" variant="contained" fullWidth>
-            Sign Up
+          <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>
+            {isSubmitting ? 'Creating account...' : 'Create account'}
           </Button>
           <Typography variant="body2" align="center" sx={{ mt: 2 }}>
             Already have an account? <a href="/signin">Sign In</a>

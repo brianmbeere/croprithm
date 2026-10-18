@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.db.database import get_db
 from app.models.produce import ProduceRequest
+from app.models.fulfillment import FulfillmentAgreement
 from app.models.user import User
 from app.schemas.produce import (
     ProduceRequestCreate, 
@@ -106,6 +107,8 @@ async def debug_get_produce_requests(
 async def get_produce_requests(
     status: Optional[str] = Query(None),
     produce_type: Optional[str] = Query(None),
+    delivery_only: bool = Query(False),
+    legacy_only: bool = Query(False),
     skip: int = Query(0),
     limit: int = Query(50),
     db: Session = Depends(get_db),
@@ -164,7 +167,19 @@ async def get_produce_requests(
 
         if status:
             query = query.filter(ProduceRequest.status == status)
-        
+
+        if delivery_only:
+            query = query.outerjoin(FulfillmentAgreement, FulfillmentAgreement.request_id == ProduceRequest.id).filter(
+                (FulfillmentAgreement.id.is_(None)) |
+                ((FulfillmentAgreement.method == "farmer_delivery") &
+                 (FulfillmentAgreement.accepted_revision == FulfillmentAgreement.revision) &
+                 (FulfillmentAgreement.stage.in_(["accepted", "ready"])))
+            )
+        elif legacy_only:
+            query = query.outerjoin(FulfillmentAgreement, FulfillmentAgreement.request_id == ProduceRequest.id).filter(
+                FulfillmentAgreement.id.is_(None)
+            )
+
         if produce_type:
             query = query.filter(ProduceRequest.produce_type.ilike(f"%{produce_type}%"))
 
@@ -213,6 +228,9 @@ async def update_request_status(
     request = db.query(ProduceRequest).filter(ProduceRequest.id == request_id).first()
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
+
+    if db.query(FulfillmentAgreement).filter(FulfillmentAgreement.request_id == request_id).first():
+        raise HTTPException(409, "Use the fulfillment workspace to quote, accept and complete this order")
 
     # Only farmers can accept/decline requests, restaurants can update their own
     if user.role == "farmer" and updates.status in ["accepted", "declined", "pending"]:
@@ -357,6 +375,9 @@ async def update_delivery_status(
     
     if user.role != "farmer" or request.assigned_seller_id != user.id:
         raise HTTPException(status_code=403, detail="Only assigned farmers can update delivery status")
+
+    if db.query(FulfillmentAgreement).filter(FulfillmentAgreement.request_id == request_id).first():
+        raise HTTPException(409, "Use the fulfillment workspace to complete this order")
 
     valid_statuses = ["in_transit", "delivered", "failed"]
     if status not in valid_statuses:
