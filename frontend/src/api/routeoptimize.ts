@@ -1,6 +1,5 @@
 import { type OptimizedStop } from "../types/route";
-
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+import { BASE_URL as API_BASE_URL } from "../utils";
 
 export type OptimizeRouteRequest = {
   pickup: string;
