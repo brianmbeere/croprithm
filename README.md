@@ -203,16 +203,19 @@ All `VITE_*` settings are public browser configuration. Do not copy database
 credentials, Firebase Admin keys, Mapbox secret tokens or service API keys into
 the static site's environment.
 
-Set the backend's **`ALLOWED_ORIGINS`** to `https://croprithm.onrender.com`.
-Add `croprithm.onrender.com` to
+Set the backend's **`ALLOWED_ORIGINS`** to include `https://croprithm.com`,
+`https://www.croprithm.com` and `https://croprithm.onrender.com`.
+Add those three hostnames to
 Firebase Authentication's authorized domains and any API-key referrer
 restrictions; allow the new origin in the public Mapbox token's URL restrictions.
 Verify maps, sign-in, API calls and direct `/signin` and `/dashboard` navigation
 before suspending the old paid frontend.
 
-The static site uses `croprithm.onrender.com`, reclaimed after deleting the old
-paid web service. The temporary `routecast-static.onrender.com` staging site is
-retired and does not redirect. Use the clean URL in links and bookmarks.
+The new static site uses `croprithm.com` with `croprithm.onrender.com` as a
+fallback hostname. The previous free `routecast.onrender.com` site remains
+available during Firebase/domain acceptance; the temporary
+`routecast-static.onrender.com` staging site is retired and does not redirect.
+Use the custom domain in new links and bookmarks.
 Static sites avoid a monthly compute charge, but workspace bandwidth and build
 minutes can still be billed. Do not create a duplicate site by applying a new
 Blueprint to a manually created resource without reconciling/importing it.
@@ -260,8 +263,10 @@ deletion, but do not track newer writes. Recovery into another instance requires
 provisioning a target and restoring a backup; pause writers and reconcile current
 data instead of overwriting newer writes with a stale cutover dump.
 
-Firebase's public configuration did not yet show `croprithm.onrender.com`
-in `routecast-49fd2` authorized domains at verification time. Existing
+Firebase's public configuration did not yet show `croprithm.com`,
+`www.croprithm.com` or `croprithm.onrender.com` in `routecast-49fd2` authorized
+domains at verification time, despite the reported console update. Confirm the
+saved settings in this specific project (number `589507409368`). Existing
 email/password sign-in was user-accepted; add the domain before using
 redirect/OAuth or domain-dependent email-link authentication. The existing local
 Firebase service-account key could not obtain a Google management token; do not
