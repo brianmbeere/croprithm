@@ -5,7 +5,7 @@ from app.core.config import setup_cors
 from app.routes import route, views, user, produce, requests, delivery, webhooks, analytics, menurithm
 
 app = FastAPI(
-    title="Routecast API",
+    title="Croprithm API",
     description="AI-powered Route & Logistics Optimizer with Produce Management",
     version="1.0.0",
     redirect_slashes=False  # Prevent 307 redirects that break CORS

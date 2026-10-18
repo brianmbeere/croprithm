@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 100" role="img" aria-label="Croprithm">
+  <rect width="100" height="100" rx="24" fill="#3A8374"/>
+  <path d="M50 78V45M50 56C28 56 20 40 23 24c18 0 30 10 27 32Zm0-10c0-20 12-31 30-31 2 20-10 34-30 31Z" fill="#A4D8C2" stroke="#F8FAF9" stroke-width="3" stroke-linejoin="round"/>
+  <text x="118" y="66" font-family="Arial, sans-serif" font-size="48" font-weight="700" fill="#1F3E37">Croprithm</text>
+</svg>

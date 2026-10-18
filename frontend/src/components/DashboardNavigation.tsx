@@ -8,7 +8,7 @@ import {
 } from "./SVGIcons";
 import { useTheme } from "@mui/material/styles";
 import { brandPalette } from "../branding";
-import logo from '../assets/routecast-logo.png';
+const logo = '/croprithm-icon.svg';
 
 interface DashboardNavigationProps {
   activeTab: number;
@@ -23,7 +23,7 @@ interface DashboardNavigationProps {
   expanded: boolean;
 }
 
-const routecastSections = [
+const croprithmSections = [
   { label: "Produce Requests", icon: (color: string) => <RestaurantIcon style={{ color }} /> },
   { label: "My Inventory", icon: (color: string) => <InventoryIcon style={{ color }} /> },
   { label: "Route Optimizer", icon: (color: string) => <RequestIcon style={{ color }} /> },
@@ -65,7 +65,7 @@ const DashboardNavigation = ({
          <IconButton edge="start" onClick={onLogoClick}>
             <img 
               src={logo} 
-              alt="Routecast Logo" 
+              alt="Croprithm Logo"
               style={{
                 height: 30,
                 objectFit: "contain",
@@ -88,7 +88,7 @@ const DashboardNavigation = ({
               flexGrow: 1,
             }}
           >
-            Routecast
+            Croprithm
           </Typography>      
         {/* 
         <IconButton onClick={handleExpandToggle} size="small" aria-label={expanded ? "Collapse drawer" : "Expand drawer"}>
@@ -98,7 +98,7 @@ const DashboardNavigation = ({
       </Toolbar>
       <Divider />
       <List sx={{ flexGrow: 1 }}>
-        {routecastSections.map((section, index) => {
+        {croprithmSections.map((section, index) => {
           const selected = activeTab === index;
           const iconColor = selected ? brandPalette.primary.contrastText : brandPalette.primary.main;
           return (
@@ -148,7 +148,7 @@ const DashboardNavigation = ({
       </List>
       <Divider />
       <Box sx={{ p: expanded ? 2: 1, pb: expanded ? 2 : 1, display:"flex", flexDirection:expanded? "row":"column" }} >
-        <Tooltip title="Sign out of Routecast" placement={expanded ? "top" : "right"} >
+        <Tooltip title="Sign out of Croprithm" placement={expanded ? "top" : "right"} >
           <Button
             variant="contained"
             fullWidth={expanded}

@@ -8,7 +8,7 @@ def read_root():
     return """
     <html>
       <head>
-        <title>Routecast MVP</title>
+        <title>Croprithm MVP</title>
         <style>
           body { background: linear-gradient(135deg, #f8fafc 0%, #c7d2fe 100%); min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: Inter, sans-serif; margin: 0; }
           h1 { font-size: 3rem; color: #3730a3; margin-bottom: 1rem; letter-spacing: 2px; }
@@ -17,7 +17,7 @@ def read_root():
         </style>
       </head>
       <body>
-        <h1>Routecast MVP</h1>
+        <h1>Croprithm MVP</h1>
         <h2>AI-powered Route & Logistics Optimizer</h2>
         <div class="soon">Coming Soon 🚀</div>
       </body>

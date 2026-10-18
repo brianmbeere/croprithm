@@ -35,7 +35,7 @@ export default defineConfig(({ command, mode }) => {
     preview: {
       host: '0.0.0.0',
       port: parseInt(process.env.PORT ?? '4173') || 4173,  // for preview
-      allowedHosts: ['routecast.onrender.com']
+      allowedHosts: ['croprithm.com', 'www.croprithm.com', 'croprithm.onrender.com']
     }
   }
 })

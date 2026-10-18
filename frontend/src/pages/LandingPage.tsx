@@ -2,7 +2,7 @@ import { Button, Card, CardContent, Container, Grid, Typography, Box } from "@mu
 import { motion } from "framer-motion";
 import { type FunctionalComponent } from "preact";
 import { brandPalette } from "../branding";
-import logoLanding from "../assets/routecast-logo-landing.png";
+const logoLanding = "/croprithm-logo.svg";
 
 const LandingPage: FunctionalComponent = () => {
   return (
@@ -34,7 +34,7 @@ const LandingPage: FunctionalComponent = () => {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box component="img" src={logoLanding} alt="Routecast Logo" sx={{ height: 48, width: "auto", background: "transparent" }} />
+          <Box component="img" src={logoLanding} alt="Croprithm Logo" sx={{ height: 48, width: "auto", background: "transparent" }} />
         </Box>
         <Button
           variant="contained"
@@ -70,7 +70,7 @@ const LandingPage: FunctionalComponent = () => {
             sx={{ width: "100%", maxWidth: 500, mx: "auto", mb: 3 }}
           />
           <Typography variant="h6" color={brandPalette.text.secondary} sx={{ maxWidth: 600, mx: "auto" }}>
-            Routecast connects farmers, restaurants, and local markets with optimized, sustainable delivery routes. Reduce waste, save fuel, and deliver fresher produce faster.
+            Croprithm connects farmers, restaurants, and local markets with optimized, sustainable delivery routes. Reduce waste, save fuel, and deliver fresher produce faster.
           </Typography>
           <Button variant="contained" size="large" href="/signin" sx={{ mt: 4, background: brandPalette.primary.main, color: brandPalette.primary.contrastText, fontWeight: 700, borderRadius: 2, px: 4, fontSize: 20, boxShadow: "0 2px 8px rgba(58,131,116,0.08)", ':hover': { background: brandPalette.secondary.main, color: brandPalette.secondary.contrastText } }}>
             Start Planning
@@ -81,7 +81,7 @@ const LandingPage: FunctionalComponent = () => {
       {/* Features Section */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Typography variant="h4" fontWeight="bold" color={brandPalette.primary.main} align="center" gutterBottom sx={{ mb: 6 }}>
-          Why Routecast?
+          Why Croprithm?
         </Typography>
         <Grid container spacing={4}>
           {[
@@ -122,7 +122,7 @@ const LandingPage: FunctionalComponent = () => {
 
       {/* Footer */}
       <Box component="footer" sx={{ textAlign: "center", py: 4, color: brandPalette.text.secondary, fontWeight: 500, letterSpacing: 1 }}>
-        © {new Date().getFullYear()} Routecast. All rights reserved.
+        © {new Date().getFullYear()} Croprithm. All rights reserved.
       </Box>
     </Box>
   );

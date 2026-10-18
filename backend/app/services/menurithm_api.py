@@ -20,7 +20,7 @@ class MenurithmAPI:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "Routecast-Backend/1.0"
+            "User-Agent": "Croprithm-Backend/1.0"
         }
     
     async def register_supplier(self, supplier_data: Dict) -> Dict:

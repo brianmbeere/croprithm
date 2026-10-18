@@ -68,7 +68,7 @@ const DashboardAppBar = ({
                 sx={{ display: "flex", alignItems: "center", fontWeight: 700, color: brandPalette.primary.contrastText }}
               >
                 <HomeIcon />
-                <Box component="span" sx={{ ml: 0.5 }}>Routecast</Box>
+                <Box component="span" sx={{ ml: 0.5 }}>Croprithm</Box>
               </MuiLink>
               <Typography sx={{ color: brandPalette.primary.contrastText }}>/</Typography>
               <Typography sx={{ color: brandPalette.primary.contrastText, fontWeight: 700 }}>{breadcrumb.title}</Typography>

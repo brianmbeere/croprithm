@@ -138,7 +138,7 @@ const SavedRoutes = () => {
   const exportMetricsReport = () => {
     const report = {
       generatedAt: new Date().toISOString(),
-      platform: "Routecast - Weather-Aware Route Optimization",
+      platform: "Croprithm - Weather-Aware Route Optimization",
       summary: {
         totalRoutesOptimized: metrics.totalRoutes,
         completedDeliveries: metrics.completedRoutes,
@@ -170,7 +170,7 @@ const SavedRoutes = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `routecast-metrics-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `croprithm-metrics-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

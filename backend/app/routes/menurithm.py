@@ -8,10 +8,10 @@ router = APIRouter(prefix="/api/menurithm", tags=["menurithm-integration"])
 
 @router.get("/integration-guide")
 async def get_menurithm_integration_guide():
-    """Complete guide for Menurithm API integration with Routecast"""
+    """Complete guide for Menurithm API integration with Croprithm"""
     return {
         "title": "Menurithm Integration Guide",
-        "description": "Complete API integration between Routecast and Menurithm platforms",
+        "description": "Complete API integration between Croprithm and Menurithm platforms",
         "version": "1.0.0",
         
         "authentication": {
@@ -80,21 +80,21 @@ async def get_menurithm_integration_guide():
         
         "api_flow": {
             "farmer_onboarding": [
-                "1. Farmer signs up/logs into Routecast",
+                "1. Farmer signs up/logs into Croprithm",
                 "2. Configure Menurithm API key: POST /api/users/menurithm/configure",
                 "3. Register as supplier: POST /api/produce/menurithm/register-supplier",
                 "4. Sync inventory: POST /api/produce/menurithm/sync-inventory"
             ],
             "request_handling": [
                 "1. Menurithm sends webhook to /api/webhooks/menurithm/request",
-                "2. Routecast creates ProduceRequest in database",
+                "2. Croprithm creates ProduceRequest in database",
                 "3. Farmer views request in dashboard",
                 "4. Farmer accepts/declines: PUT /api/requests/{id}/status",
-                "5. Routecast notifies Menurithm of decision",
+                "5. Croprithm notifies Menurithm of decision",
                 "6. Farmer updates delivery status: PUT /api/requests/{id}/delivery-status"
             ],
             "inventory_management": [
-                "1. Farmer updates inventory in Routecast",
+                "1. Farmer updates inventory in Croprithm",
                 "2. Auto-sync triggers: POST /api/produce/menurithm/sync-inventory",
                 "3. Menurithm inventory updated with latest data"
             ]
@@ -103,12 +103,12 @@ async def get_menurithm_integration_guide():
         "data_synchronization": {
             "inventory_sync": {
                 "frequency": "Real-time on updates",
-                "direction": "Routecast → Menurithm",
+                "direction": "Croprithm → Menurithm",
                 "fields": ["produce_type", "quantity", "price", "organic", "availability"]
             },
             "request_sync": {
                 "frequency": "Real-time via webhooks",
-                "direction": "Menurithm → Routecast",
+                "direction": "Menurithm → Croprithm",
                 "fields": ["restaurant_info", "produce_needs", "delivery_details"]
             },
             "status_updates": {

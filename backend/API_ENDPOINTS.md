@@ -1,7 +1,7 @@
-# Routecast API - Produce Management Endpoints
+# Croprithm API - Produce Management Endpoints
 
 ## Overview
-This document describes the new API endpoints added to Routecast for produce management and Menurithm integration.
+This document describes the new API endpoints added to Croprithm for produce management and Menurithm integration.
 
 ## Authentication
 All endpoints (except webhooks and public produce listings) require Firebase authentication. Include the Firebase ID token in the Authorization header:

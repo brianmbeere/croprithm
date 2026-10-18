@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material/styles";
 
  // Brand palette
-// Updated Brand palette for Routecast based on logo
+// Updated Brand palette for Croprithm based on logo
 
 export const brandPalette = {
   primary: {
@@ -9,7 +9,7 @@ export const brandPalette = {
     contrastText: "#FFFFFF",
   },
   secondary: {
-    main: "#60B393", // Soft green used for ROUTECAST text
+    main: "#60B393", // Soft green used for CROPRITHM text
     contrastText: "#1F3E37",
   },
   accent: {
