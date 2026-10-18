@@ -13,6 +13,11 @@ const stops: DeliveryStop[] = [1, 2].map(id => ({
   id, route_id: 1, request_id: id, stop_order: id, address: `Restaurant ${id}, Nairobi`,
   latitude: -1.28, longitude: 36.82, status: "pending", actual_arrival: null,
 }));
+const fulfillment = new URLSearchParams(location.search).has("fulfillment");
+if (fulfillment) {
+  stops[0].fulfillment_stage = "accepted";
+  stops[0].fulfillment_method = "farmer_delivery";
+}
 deliveryRouteApi.getAllRoutes = async () => [{ ...route }];
 produceRequestApi.getRequests = async () => [1, 2].map(id => ({
   id, restaurant_name: `Restaurant ${id}`, produce_type: "Tomato", quantity_needed: 2,
@@ -34,6 +39,16 @@ deliveryRouteApi.updateStopStatus = async (_routeId, stopId, status) => {
   const stop = stops.find(item => item.id === stopId);
   if (!stop) throw new Error("Stop not found");
   stop.status = status;
+  route.status = "active";
+  return { ...stop };
+};
+deliveryRouteApi.updateHandover = async (_routeId, stopId, stage) => {
+  if (new URLSearchParams(location.search).has("handover-error")) throw new Error("Fixture: handover could not be saved. Please retry.");
+  const stop = stops.find(item => item.id === stopId);
+  if (!stop || stop.fulfillment_method !== "farmer_delivery") throw new Error("Fixture order not found");
+  if (stage === "delivered" && stop.fulfillment_stage !== "ready") throw new Error("Mark produce ready first");
+  stop.fulfillment_stage = stage;
+  if (stage === "delivered") stop.status = "delivered";
   route.status = "active";
   return { ...stop };
 };

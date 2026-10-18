@@ -94,6 +94,8 @@ export interface DeliveryStop {
   longitude: number | null;
   status: StopStatus | "failed";
   actual_arrival: string | null;
+  fulfillment_stage?: string | null;
+  fulfillment_method?: string | null;
 }
 
 async function routeError(response: Response, message: string): Promise<never> {
@@ -362,6 +364,14 @@ export const deliveryRouteApi = {
       method: "PUT", headers: await getAuthHeaders(), body: JSON.stringify({ status }),
     });
     if (!response.ok) return routeError(response, "Failed to save delivery progress");
+    return response.json();
+  },
+
+  async updateHandover(routeId: number, stopId: number, stage: "ready" | "delivered"): Promise<DeliveryStop> {
+    const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/stops/${stopId}/handover`, {
+      method: "PUT", headers: await getAuthHeaders(), body: JSON.stringify({ stage }),
+    });
+    if (!response.ok) return routeError(response, "Failed to confirm order handover");
     return response.json();
   },
 };

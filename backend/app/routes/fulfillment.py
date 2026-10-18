@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.produce import ProduceRequest
 from app.models.fulfillment import FulfillmentAgreement
 from app.utils.auth_dependency import verify_firebase_token
+from app.services.fulfillment import advance_handover
 
 router = APIRouter(prefix="/api/fulfillment", tags=["fulfillment"])
 Method = Literal["customer_pickup", "farmer_delivery"]
@@ -214,15 +215,6 @@ def update_stage(identifier: int, data: StageInput, user: User = Depends(farmer)
     if not agreement:
         raise HTTPException(404, "Order not found")
     order = db.query(ProduceRequest).filter(ProduceRequest.id == agreement.request_id).with_for_update().first()
-    if order.assigned_seller_id != user.id:
-        raise HTTPException(403, "Order belongs to another farmer")
-    next_stage = {"accepted": "ready", "ready": "collected" if agreement.method == "customer_pickup" else "delivered"}
-    if data.stage == agreement.stage:
-        return serialize(agreement, order)
-    if next_stage.get(agreement.stage) != data.stage or agreement.accepted_revision != agreement.revision:
-        raise HTTPException(409, "Accept the quote and follow ready → collected/delivered")
-    agreement.stage = data.stage
-    if data.stage in ["collected", "delivered"]:
-        order.status = "completed"
+    advance_handover(agreement, order, data.stage, user.id)
     db.commit()
     return serialize(agreement, order)

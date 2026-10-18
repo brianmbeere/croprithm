@@ -1,5 +1,6 @@
 import os
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from fastapi import FastAPI
@@ -13,7 +14,7 @@ os.environ.setdefault("MENURITHM_API_KEY", "test-only")
 
 from app.db.database import Base, get_db
 from app.models.user import User
-from app.models.produce import ProduceRequest
+from app.models.produce import ProduceRequest, DeliveryRoute, DeliveryStop
 from app.models.fulfillment import FulfillmentAgreement
 from app.models.route import OptimizedStop, RouteResponse
 with patch("firebase_admin.credentials.Certificate"), patch("firebase_admin.initialize_app"):
@@ -171,6 +172,107 @@ class FulfillmentTests(unittest.TestCase):
             self.assertEqual(self.quote(order, fee=fee).status_code, 422)
         self.assertEqual(self.quote(order, currency="KES").status_code, 422)
         self.assertEqual(self.quote(order, instructions=" ").status_code, 422)
+
+    def route_stop(self, order):
+        with self.sessions() as db:
+            route = DeliveryRoute(seller_id=1, route_name="Fixture", pickup_location="Farm",
+                                  delivery_date=datetime.now(timezone.utc), status="planned")
+            db.add(route)
+            db.flush()
+            stop = DeliveryStop(route_id=route.id, request_id=order["request_id"],
+                                stop_order=1, address="Market", status="pending")
+            db.add(stop)
+            db.commit()
+            return route.id, stop.id
+
+    def test_route_handover_updates_order_and_stop_and_survives_reload(self):
+        order = self.create()
+        self.quote(order)
+        self.accept(order)
+        route_id, stop_id = self.route_stop(order)
+        path = f"/api/routes/{route_id}/stops/{stop_id}"
+        self.assertEqual(self.client.get(f"/api/routes/{route_id}/stops").json()[0]["fulfillment_stage"], "accepted")
+        self.assertEqual(self.client.put(path + "/handover", json={"stage": "delivered"}).status_code, 409)
+        ready = self.client.put(path + "/handover", json={"stage": "ready"})
+        self.assertEqual(ready.status_code, 200, ready.text)
+        self.assertEqual(ready.json()["status"], "pending")
+        result = self.client.put(path + "/handover", json={"stage": "delivered"})
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()["status"], "delivered")
+        self.assertEqual(result.json()["fulfillment_stage"], "delivered")
+        repeated = self.client.put(path + "/handover", json={"stage": "delivered"})
+        self.assertEqual(repeated.json()["actual_arrival"], result.json()["actual_arrival"])
+        self.assertEqual(self.client.get("/api/fulfillment/orders").json()[0]["stage"], "delivered")
+        self.assertEqual(self.client.get(f"/api/routes/{route_id}/stops").json()[0]["fulfillment_stage"], "delivered")
+        self.assertEqual(self.client.put(path + "/status", json={"status": "pending"}).status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceRequest, order["request_id"]).status, "completed")
+        self.assertEqual(self.client.put(f"/api/routes/{route_id}/status?status=completed").status_code, 200)
+
+    def test_route_handover_guards_and_reconciliation_after_route_completion(self):
+        order = self.create()
+        self.quote(order)
+        route_id, stop_id = self.route_stop(order)
+        path = f"/api/routes/{route_id}/stops/{stop_id}/handover"
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 409)
+        self.accept(order)
+        self.uid = "other"
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 404)
+        self.uid = "farmer"
+        self.assertEqual(self.client.put(f"/api/routes/{route_id}/stops/999/handover", json={"stage": "ready"}).status_code, 404)
+        with self.sessions() as db:
+            db.get(DeliveryRoute, route_id).status = "cancelled"
+            db.commit()
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 409)
+        with self.sessions() as db:
+            db.get(DeliveryRoute, route_id).status = "completed"
+            db.get(DeliveryStop, stop_id).status = "delivered"
+            db.commit()
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 200)
+        self.assertEqual(self.client.put(path, json={"stage": "delivered"}).status_code, 200)
+        with self.sessions() as db:
+            self.assertEqual(db.get(DeliveryRoute, route_id).status, "completed")
+
+    def test_route_handover_rejects_pickup_and_does_not_change_stop(self):
+        order = self.create(method="customer_pickup", delivery_address="")
+        self.quote(order, fee="0", pickup_address="Farm")
+        self.accept(order)
+        route_id, stop_id = self.route_stop(order)
+        response = self.client.put(f"/api/routes/{route_id}/stops/{stop_id}/handover", json={"stage": "ready"})
+        self.assertEqual(response.status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.get(DeliveryStop, stop_id).status, "pending")
+            self.assertEqual(db.query(FulfillmentAgreement).one().stage, "accepted")
+
+    def test_failed_route_handover_commit_rolls_back_all_three_records(self):
+        order = self.create()
+        self.quote(order)
+        self.accept(order)
+        self.stage(order, "ready")
+        route_id, stop_id = self.route_stop(order)
+        with patch("sqlalchemy.orm.Session.commit", side_effect=RuntimeError("Simulated commit failure")):
+            with self.assertRaisesRegex(RuntimeError, "Simulated commit failure"):
+                self.client.put(f"/api/routes/{route_id}/stops/{stop_id}/handover", json={"stage": "delivered"})
+        with self.sessions() as db:
+            self.assertEqual(db.get(DeliveryStop, stop_id).status, "pending")
+            self.assertEqual(db.get(ProduceRequest, order["request_id"]).status, "accepted")
+            self.assertEqual(db.query(FulfillmentAgreement).one().stage, "ready")
+
+    def test_route_handover_rejects_stale_acceptance_and_legacy_orders(self):
+        order = self.create()
+        self.quote(order)
+        self.accept(order)
+        route_id, stop_id = self.route_stop(order)
+        path = f"/api/routes/{route_id}/stops/{stop_id}/handover"
+        with self.sessions() as db:
+            db.query(FulfillmentAgreement).one().revision = 2
+            db.commit()
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.get(DeliveryStop, stop_id).status, "pending")
+            db.query(FulfillmentAgreement).delete()
+            db.commit()
+        self.assertEqual(self.client.put(path, json={"stage": "ready"}).status_code, 409)
 
     def test_bridge_requires_secret_and_scopes_identity(self):
         del self.app.dependency_overrides[fulfillment.customer_identity]

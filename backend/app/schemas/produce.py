@@ -132,12 +132,17 @@ class DeliveryStopResponse(BaseModel):
     actual_arrival: Optional[datetime]
     status: str
     notes: Optional[str]
+    fulfillment_stage: Optional[str] = None
+    fulfillment_method: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
 
 class DeliveryStopUpdate(BaseModel):
     status: Literal["pending", "en_route", "arrived", "delivered", "skipped"]
+
+class RouteHandoverUpdate(BaseModel):
+    stage: Literal["ready", "delivered"]
 
 # Menurithm Integration Schemas
 class MenurithmWebhookRequest(BaseModel):

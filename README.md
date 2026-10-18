@@ -29,8 +29,12 @@ dependency between the apps. Farmer confirmation is not customer proof of receip
 New pickup orders and unapproved delivery quotes cannot enter delivery routes.
 Historical requests remain in **Legacy requests** with their original behavior.
 Existing routes and database rows are not reinterpreted or migrated.
-Route stop progress remains separate: finish the actual handover in
-**Orders & handovers**, even if you have marked a route stop delivered.
+From a saved itinerary in **Route Planner** or **Saved Routes > View Details**,
+use **Mark produce ready**, then **Confirm delivered to customer** after the
+physical handover. Explicit confirmation atomically updates the agreement,
+customer order and route stop, just like the action in **Orders & handovers**.
+Ordinary route progress and legacy **Mark delivered** do not confirm an order.
+This follow-up requires no database migration.
 
 ### Backend setup and deployment order
 
@@ -76,10 +80,14 @@ navigation SDK, background GPS or automatic proof of delivery is provided.
    or invalid. The navigation provider starts from the user's current location
    and may choose different roads, traffic estimates and arrival times.
 4. Return to Croprithm while safely parked to record **En route**, **Arrived**,
-   **Mark delivered**, **Skip stop**, or **Reset**. Opening Maps does not update
+   **Skip stop**, or **Reset**. For approved farmer deliveries, mark produce ready,
+   then explicitly confirm delivery using the confirmation dialog. Historical
+   requests retain route-only **Mark delivered**. Opening Maps does not update
    progress. Resume a saved itinerary from **Saved Routes > View Details**.
 5. Complete a route only after every stop is delivered. Skipped stops remain
-   unresolved; cancelled/completed routes cannot accept progress updates.
+   unresolved; cancelled/completed routes cannot accept ordinary progress updates.
+   A completed route can still confirm an outstanding approved handover without
+   reopening the route; cancelled routes cannot.
 
 An internet connection is required to save/load progress. Manual-address previews
 are not persistent. Saving selected orders recalculates their itinerary; inspect
@@ -88,9 +96,10 @@ scheduled again. Re-optimization is limited to planned routes with no recorded p
 All selected addresses must geocode successfully; failures no longer silently
 omit deliveries. Identical addresses retain separate order/stop identities.
 
-Stop progress is separate from order acceptance and does not automatically
-confirm fulfillment in Menurithm. Reliable cross-app delivery confirmation,
-offline synchronization, real-device pilot validation and native-app decisions
+Ordinary stop progress never bypasses order acceptance. Explicit order handover
+confirmation is visible when the Menurithm customer refreshes their orders; it
+does not record payment or customer proof of receipt. Offline synchronization,
+real-device pilot validation and native-app decisions
 are tracked in the [Croprithm Pilot Roadmap](https://github.com/users/brianmbeere/projects/3).
 Existing route metrics are planning estimates; assumed savings are not measured
 pilot outcomes. Passenger-car Maps directions are not truck-clearance routing.

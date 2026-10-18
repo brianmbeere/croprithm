@@ -485,10 +485,11 @@ const SavedRoutes = () => {
               <DeliveryItinerary
                 routeId={selectedRoute.id}
                 editable={["planned", "active"].includes(selectedRoute.status)}
+                handoverEditable={selectedRoute.status !== "cancelled"}
                 onProgress={() => {
-                  setSelectedRoute(previous => previous ? { ...previous, status: "active" } : previous);
+                  setSelectedRoute(previous => previous && previous.status === "planned" ? { ...previous, status: "active" } : previous);
                   setAllRoutes(previous => previous.map(route =>
-                    route.id === selectedRoute.id ? { ...route, status: "active" } : route));
+                    route.id === selectedRoute.id && route.status === "planned" ? { ...route, status: "active" } : route));
                 }}
               />
 

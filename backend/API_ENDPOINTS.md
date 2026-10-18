@@ -47,6 +47,8 @@ independently enforces approved farmer-delivery eligibility.
 
 `GET /api/routes/{route_id}/stops` returns saved delivery stops in `stop_order`.
 Pickup is not a delivery stop. Access is restricted to the route owner.
+Each stop includes nullable `fulfillment_stage` and `fulfillment_method`;
+both are null for historical requests without an agreement.
 
 ```http
 PUT /api/routes/{route_id}/stops/{stop_id}/status
@@ -71,8 +73,27 @@ and fails with 422 if any delivery address cannot be geocoded.
 
 Navigation is a client-side Google/Apple Maps link, not a tracking endpoint.
 Opening it never changes route/stop state and requires no navigation API key.
-Stop updates do not automatically complete produce requests or notify Menurithm;
-cross-app confirmation is tracked separately in the pilot roadmap.
+Ordinary stop status updates do not complete produce requests. Once an agreement
+has confirmed delivery, its stop cannot be reset to another status.
+
+#### Explicit order handover from a saved itinerary
+
+`PUT /api/routes/{route_id}/stops/{stop_id}/handover` accepts
+`{"stage": "ready"}` followed by `{"stage": "delivered"}`. Only the assigned
+farmer owning the route may act. The agreement must be an approved, current
+farmer-delivery quote; pickup and historical requests return 409.
+
+Delivery confirmation updates agreement stage, request status (`completed`),
+stop status (`delivered`) and first arrival timestamp in one transaction. The
+response is the enriched `DeliveryStopResponse`. Repeated delivery is idempotent.
+Premature delivery and cancelled routes return 409; foreign/missing routes or
+stops return 404. Completed routes may reconcile an outstanding handover without
+reopening the route. Other non-completed routes become active on handover.
+
+The shared itinerary exposes a physical-handover confirmation dialog, not an
+automatic Maps/GPS action. Menurithm sees the order update on refresh through
+the existing bridge; no callback, payment or customer receipt proof is implied.
+No schema migration is required for this endpoint.
 
 ### 📦 Produce Inventory Management
 

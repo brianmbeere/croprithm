@@ -12,12 +12,21 @@ from app.schemas.produce import (
     DeliveryRouteResponse,
     DeliveryStopResponse,
     DeliveryStopUpdate,
+    RouteHandoverUpdate,
 )
 from app.utils.auth_dependency import verify_firebase_token
 from app.services.route_optimizer import optimize_route_from_requests
+from app.services.fulfillment import advance_handover
 
 router = APIRouter(prefix="/api/routes", tags=["routes"])
 logger = logging.getLogger(__name__)
+
+def stop_response(stop: DeliveryStop, agreement: FulfillmentAgreement | None):
+    result = DeliveryStopResponse.model_validate(stop)
+    if agreement:
+        result.fulfillment_stage = agreement.stage
+        result.fulfillment_method = agreement.method
+    return result
 
 @router.post("/from-requests", response_model=DeliveryRouteResponse)
 async def create_route_from_requests(
@@ -266,7 +275,12 @@ async def get_route_stops(
         DeliveryStop.route_id == route_id
     ).order_by(DeliveryStop.stop_order).all()
     
-    return stops
+    agreements = {
+        item.request_id: item for item in db.query(FulfillmentAgreement).filter(
+            FulfillmentAgreement.request_id.in_([stop.request_id for stop in stops])
+        ).all()
+    }
+    return [stop_response(stop, agreements.get(stop.request_id)) for stop in stops]
 
 
 @router.put("/{route_id}/stops/{stop_id}/status", response_model=DeliveryStopResponse)
@@ -292,6 +306,11 @@ async def update_stop_status(
     ).first()
     if not stop:
         raise HTTPException(status_code=404, detail="Stop not found")
+    agreement = db.query(FulfillmentAgreement).filter(
+        FulfillmentAgreement.request_id == stop.request_id
+    ).with_for_update().first()
+    if agreement and agreement.stage == "delivered" and updates.status != "delivered":
+        raise HTTPException(409, "This order is confirmed delivered; its route stop cannot be reset")
     if updates.status in ["arrived", "delivered"]:
         if stop.actual_arrival is None:
             stop.actual_arrival = datetime.now(timezone.utc)
@@ -302,4 +321,47 @@ async def update_stop_status(
         route.status = "active"
     db.commit()
     db.refresh(stop)
-    return stop
+    return stop_response(stop, agreement)
+
+
+@router.put("/{route_id}/stops/{stop_id}/handover", response_model=DeliveryStopResponse)
+async def update_stop_handover(
+    route_id: int,
+    stop_id: int,
+    updates: RouteHandoverUpdate,
+    db: Session = Depends(get_db),
+    firebase_user: dict = Depends(verify_firebase_token),
+):
+    seller = db.query(User).filter(User.firebase_uid == firebase_user["uid"]).first()
+    if not seller or seller.role != "farmer":
+        raise HTTPException(403, "Farmer account required")
+    route = db.query(DeliveryRoute).filter(
+        DeliveryRoute.id == route_id, DeliveryRoute.seller_id == seller.id
+    ).with_for_update().first()
+    if not route:
+        raise HTTPException(404, "Route not found")
+    stop = db.query(DeliveryStop).filter(
+        DeliveryStop.id == stop_id, DeliveryStop.route_id == route_id
+    ).first()
+    if not stop:
+        raise HTTPException(404, "Stop not found")
+    if route.status == "cancelled":
+        raise HTTPException(409, "Cancelled routes cannot confirm order handover")
+    agreement = db.query(FulfillmentAgreement).filter(
+        FulfillmentAgreement.request_id == stop.request_id
+    ).with_for_update().first()
+    if not agreement:
+        raise HTTPException(409, "This historical order does not use fulfillment agreements")
+    if agreement.method != "farmer_delivery":
+        raise HTTPException(409, "Pickup orders cannot be completed from a delivery route")
+    order = db.query(ProduceRequest).filter(ProduceRequest.id == stop.request_id).with_for_update().one()
+    advance_handover(agreement, order, updates.stage, seller.id)
+    if route.status == "planned":
+        route.status = "active"
+    if updates.stage == "delivered":
+        stop.status = "delivered"
+        if stop.actual_arrival is None:
+            stop.actual_arrival = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(stop)
+    return stop_response(stop, agreement)
