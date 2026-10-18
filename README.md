@@ -183,7 +183,46 @@ The `_pilot` names above are fresh-install examples. The inspected live instance
 are Basic 256 MB, not legacy Starter: the 5 GB Menurithm instance is the smaller
 consolidation target. Retain the original 15 GB Routecast instance for rollback
 until the consolidated deployment is accepted; it continues to incur charges
-while retained.
+while running, and storage charges may remain while suspended.
+
+#### Verified live layout (2026-10-18)
+
+The active frontend is https://routecast-static.onrender.com, deploying from
+this repository's `main` branch with the static settings in
+[`render.yaml`](render.yaml). The existing API URL remains
+https://routecast-core.onrender.com. Live Render settings match the YAML;
+changing YAML alone does not attach a manually created site to Blueprint sync.
+
+The API now connects to the **Menurithm Postgres instance** with
+`DB_NAME=routecast`, a URL ending in `/routecast`, and the dedicated
+`routecast_api` login. Its pool is explicitly set to 2 retained connections,
+1 overflow, a 30-second timeout and 1800-second recycling. Menurithm remains on
+the separate `menurithm` logical database.
+
+Both APIs were paused before cutover backups. The restored Routecast tables
+matched source row counts, content digests and sequence values. Live
+database-backed API reads, CORS for the static origin, SPA deep links, assets,
+and Mapbox origin access were verified. The user accepted both new frontends
+before the old paid frontends were suspended.
+
+The original Routecast Postgres instance is **suspended, not deleted**. Both APIs
+were verified again after its suspension. This stops its compute while retaining
+rollback data; storage charges may remain. Combined with the two suspended
+frontend services, approximately $20/month of compute was removed at current
+published rates. No database deletion is scheduled.
+
+The old `routecast.onrender.com` frontend is unavailable, not redirected. Old
+database backups and the suspended database do not track new writes. To roll
+back after accepting writes, resume the old instance and pause writers while
+copying/reconciling the newest data; do not simply point the API at stale data.
+
+Firebase's public configuration did not yet show `routecast-static.onrender.com`
+in `routecast-49fd2` authorized domains at verification time. Existing
+email/password sign-in was user-accepted; add the domain before using
+redirect/OAuth or domain-dependent email-link authentication. The existing local
+Firebase service-account key could not obtain a Google management token; do not
+reuse it for deployment administration. Never put a replacement private key in
+the frontend or commit one to this repository.
 
 ---
 
