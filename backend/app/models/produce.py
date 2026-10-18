@@ -84,7 +84,7 @@ class DeliveryStop(Base):
     longitude = Column(Float, nullable=True)
     estimated_arrival = Column(DateTime(timezone=True), nullable=True)
     actual_arrival = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String, default="pending")  # pending, en_route, delivered, failed
+    status = Column(String, default="pending")  # pending, en_route, arrived, delivered, skipped; legacy failed
     notes = Column(Text, nullable=True)
 
     # Relationships

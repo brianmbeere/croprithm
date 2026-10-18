@@ -143,6 +143,8 @@ async def optimize_route_real(request: RouteRequest) -> RouteResponse:
         coords = await geocode_address(stop.address)
         if coords:
             geocoded_stops.append({"address": stop.address, "location": coords})
+        else:
+            raise ValueError(f"Could not locate delivery address: {stop.address}")
 
     if not geocoded_stops:
         raise ValueError("No deliverable stops could be geocoded")

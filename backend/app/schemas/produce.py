@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 # Produce Inventory Schemas
@@ -97,12 +97,12 @@ class ProduceRequestResponse(BaseModel):
 
 # Delivery Route Schemas
 class DeliveryRouteCreate(BaseModel):
-    route_name: str
-    pickup_location: str
+    route_name: str = Field(min_length=1, max_length=200)
+    pickup_location: str = Field(min_length=1)
     pickup_latitude: Optional[float] = None
     pickup_longitude: Optional[float] = None
     delivery_date: datetime
-    request_ids: List[int]  # List of produce request IDs to include
+    request_ids: List[int] = Field(min_length=1)
 
 class DeliveryRouteResponse(BaseModel):
     id: int
@@ -134,6 +134,10 @@ class DeliveryStopResponse(BaseModel):
     notes: Optional[str]
 
     model_config = {"from_attributes": True}
+
+
+class DeliveryStopUpdate(BaseModel):
+    status: Literal["pending", "en_route", "arrived", "delivered", "skipped"]
 
 # Menurithm Integration Schemas
 class MenurithmWebhookRequest(BaseModel):

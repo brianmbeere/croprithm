@@ -11,6 +11,37 @@ Authorization: Bearer <firebase_id_token>
 
 ## API Endpoints
 
+### Mobile delivery pilot: saved progress
+
+`GET /api/routes/{route_id}/stops` returns saved delivery stops in `stop_order`.
+Pickup is not a delivery stop. Access is restricted to the route owner.
+
+```http
+PUT /api/routes/{route_id}/stops/{stop_id}/status
+Content-Type: application/json
+Authorization: Bearer <Firebase ID token>
+
+{"status": "arrived"}
+```
+
+Allowed statuses: `pending`, `en_route`, `arrived`, `delivered`, `skipped`.
+The response is the updated `DeliveryStopResponse`. Arrival time is recorded on
+the first arrived/delivered update and retained on repeated updates. Resetting
+to pending/en_route or skipping clears that arrival time. Non-pending progress
+activates the route. Closed routes reject updates with HTTP 409; missing or
+other-owner routes/stops return 404; invalid status values return 422.
+
+`PUT /api/routes/{route_id}/status?status=completed` returns 409 until every stop
+is delivered; skipped stops are unresolved. Re-optimization is only allowed on
+planned routes with all stops pending. Creation from requests is atomic, requires
+accepted assigned orders, rejects duplicate scheduling on non-cancelled routes,
+and fails with 422 if any delivery address cannot be geocoded.
+
+Navigation is a client-side Google/Apple Maps link, not a tracking endpoint.
+Opening it never changes route/stop state and requires no navigation API key.
+Stop updates do not automatically complete produce requests or notify Menurithm;
+cross-app confirmation is tracked separately in the pilot roadmap.
+
 ### 📦 Produce Inventory Management
 
 #### Create Produce Inventory

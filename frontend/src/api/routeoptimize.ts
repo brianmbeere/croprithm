@@ -26,7 +26,10 @@ export async function optimizeRoute(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to optimize route: ${response.statusText}`);
+    const error: unknown = await response.json();
+    const message = typeof error === "object" && error !== null && "detail" in error && typeof error.detail === "string"
+      ? error.detail : `Failed to optimize route (HTTP ${response.status})`;
+    throw new Error(message);
   }
 
   return await response.json();

@@ -87,15 +87,15 @@ const LandingPage: FunctionalComponent = () => {
           {[
             {
               title: "🚚 Optimized Farm-to-Table Delivery",
-              desc: "Connect farms, markets, and restaurants with the most efficient, sustainable routes—minimizing food miles and maximizing freshness.",
+              desc: "Coordinate pickups and delivery stops between farms, markets, and restaurants with suggested stop ordering.",
             },
             {
               title: "🌱 Reduce Waste, Boost Profit",
               desc: "Smart routing means less spoilage, fewer empty miles, and more revenue for every stakeholder in the supply chain.",
             },
             {
-              title: "📦 Real-Time Tracking & Insights",
-              desc: "Monitor deliveries, track produce freshness, and get actionable insights to improve every route.",
+              title: "📦 Plan Here, Navigate with Maps",
+              desc: "Save delivery stops, open Google Maps or Apple Maps for directions, and return to record progress. No dedicated navigation app required.",
             },
           ].map((feature, index) => (
             <Grid key={index} sx={{ xs: 12, sm: 6, md: 4 }}>

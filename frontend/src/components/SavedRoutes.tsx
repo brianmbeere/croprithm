@@ -23,6 +23,8 @@ import {
 } from "@mui/material";
 import { MoreVertIcon, DeleteIcon } from "./SVGIcons";
 import { deliveryRouteApi, type DeliveryRoute } from "../api/produceApi";
+import DeliveryItinerary from "./route/DeliveryItinerary";
+import NavigationButtons from "./route/NavigationButtons";
 
 interface RouteMetrics {
   totalRoutes: number;
@@ -41,6 +43,7 @@ const SavedRoutes = () => {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<DeliveryRoute | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
 
   // Calculate metrics from routes
@@ -85,13 +88,18 @@ const SavedRoutes = () => {
   };
 
   const handleStatusChange = async (routeId: number, newStatus: string) => {
+    setSavingStatus(true);
+    setError(null);
     try {
       await deliveryRouteApi.updateStatus(routeId, newStatus);
+      setSelectedRoute(previous => previous?.id === routeId ? { ...previous, status: newStatus } : previous);
       await loadRoutes();
-      handleCloseMenu();
+      setMenuAnchor(null);
     } catch (err) {
       console.error("Failed to update status:", err);
-      setError("Failed to update route status.");
+      setError(err instanceof Error ? err.message : "Failed to update route status.");
+    } finally {
+      setSavingStatus(false);
     }
   };
 
@@ -108,7 +116,8 @@ const SavedRoutes = () => {
   const handleViewDetails = (route: DeliveryRoute) => {
     setSelectedRoute(route);
     setDetailsOpen(true);
-    handleCloseMenu();
+    setMenuAnchor(null);
+    setError(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -120,7 +129,7 @@ const SavedRoutes = () => {
     });
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): "success" | "primary" | "info" | "error" | "default" => {
     switch (status) {
       case "completed":
         return "success";
@@ -185,7 +194,7 @@ const SavedRoutes = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={3}>
         <Typography variant="h5">Saved Routes & Delivery History</Typography>
         <Stack direction="row" spacing={1}>
           <Button onClick={loadRoutes} variant="outlined" size="small">
@@ -209,7 +218,8 @@ const SavedRoutes = () => {
           Route Optimization Metrics
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Real-time analytics demonstrating operational efficiency and environmental impact
+          Recorded route totals and planning estimates, not live GPS telemetry.
+          Savings below assume a 15% improvement and are not measured pilot outcomes.
         </Typography>
         <Grid container spacing={3}>
           <Grid size={{ xs: 6, md: 2 }}>
@@ -340,7 +350,7 @@ const SavedRoutes = () => {
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Chip
                         label={route.status}
-                        color={getStatusColor(route.status) as any}
+                        color={getStatusColor(route.status)}
                         size="small"
                       />
                       <IconButton size="small" onClick={(e) => handleMenuOpen(e, route)}>
@@ -413,16 +423,17 @@ const SavedRoutes = () => {
           View Details
         </MenuItem>
         {selectedRoute?.status === "planned" && (
-          <MenuItem onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "active")}>
+          <MenuItem disabled={savingStatus} onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "active")}>
             Start Route
           </MenuItem>
         )}
         {selectedRoute?.status === "active" && (
-          <MenuItem onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "completed")}>
+          <MenuItem disabled={savingStatus} onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "completed")}>
             Mark Completed
           </MenuItem>
         )}
         <MenuItem
+          disabled={savingStatus}
           onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "cancelled")}
           sx={{ color: "error.main" }}
         >
@@ -438,13 +449,14 @@ const SavedRoutes = () => {
           {selectedRoute && (
             <Chip
               label={selectedRoute.status}
-              color={getStatusColor(selectedRoute.status) as any}
+              color={getStatusColor(selectedRoute.status)}
               size="small"
               sx={{ ml: 2 }}
             />
           )}
         </DialogTitle>
         <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           {selectedRoute && (
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Box>
@@ -459,9 +471,26 @@ const SavedRoutes = () => {
                   Pickup Location
                 </Typography>
                 <Typography variant="body1">{selectedRoute.pickup_location}</Typography>
+                <Box sx={{ mt: 1 }}>
+                  <NavigationButtons destination={{
+                    address: selectedRoute.pickup_location,
+                    latitude: selectedRoute.pickup_latitude,
+                    longitude: selectedRoute.pickup_longitude,
+                  }} />
+                </Box>
               </Box>
 
               <Divider />
+
+              <DeliveryItinerary
+                routeId={selectedRoute.id}
+                editable={["planned", "active"].includes(selectedRoute.status)}
+                onProgress={() => {
+                  setSelectedRoute(previous => previous ? { ...previous, status: "active" } : previous);
+                  setAllRoutes(previous => previous.map(route =>
+                    route.id === selectedRoute.id ? { ...route, status: "active" } : route));
+                }}
+              />
 
               <Grid container spacing={2}>
                 <Grid size={{ xs: 6 }}>
@@ -518,10 +547,10 @@ const SavedRoutes = () => {
           <Button onClick={() => setDetailsOpen(false)}>Close</Button>
           {selectedRoute?.status === "planned" && (
             <Button
+              disabled={savingStatus}
               variant="contained"
               onClick={() => {
                 handleStatusChange(selectedRoute.id, "active");
-                setDetailsOpen(false);
               }}
             >
               Start Route
@@ -529,11 +558,11 @@ const SavedRoutes = () => {
           )}
           {selectedRoute?.status === "active" && (
             <Button
+              disabled={savingStatus}
               variant="contained"
               color="success"
               onClick={() => {
                 handleStatusChange(selectedRoute.id, "completed");
-                setDetailsOpen(false);
               }}
             >
               Mark Completed

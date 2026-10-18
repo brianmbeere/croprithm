@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
 } from "@mui/material";
 import { type FunctionalComponent } from "preact";
 import {
@@ -25,11 +26,13 @@ import {
   type OptimizeRouteRequest,
   type OptimizeRouteResponse,
 } from "../api/routeoptimize";
-import { produceRequestApi, type ProduceRequest as BackendProduceRequest } from "../api/produceApi";
+import { produceRequestApi, deliveryRouteApi, type DeliveryRoute, type ProduceRequest as BackendProduceRequest } from "../api/produceApi";
 import StopInputList from "../components/route/StopInputList";
 import MapboxRouteMap from "../components/route/MapboxRouteMap";
 import AutocompleteTextField from "../components/route/AutoCompleteTextField";
-import { ContentCopyIcon, DeleteIcon } from '../components/SVGIcons';
+import { DeleteIcon } from '../components/SVGIcons';
+import NavigationButtons from "../components/route/NavigationButtons";
+import DeliveryItinerary from "../components/route/DeliveryItinerary";
 
 const RoutePlanner: FunctionalComponent = () => {
   const ctx = useContext(SelectedRequestsContext);
@@ -42,7 +45,9 @@ const RoutePlanner: FunctionalComponent = () => {
   );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<OptimizeRouteResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeName, setRouteName] = useState("Today's deliveries");
+  const [savedRoute, setSavedRoute] = useState<DeliveryRoute | null>(null);
 
   // Accepted orders from backend
   const [acceptedOrders, setAcceptedOrders] = useState<BackendProduceRequest[]>([]);
@@ -57,6 +62,10 @@ const RoutePlanner: FunctionalComponent = () => {
   useEffect(() => {
     loadAcceptedOrders();
   }, []);
+
+  useEffect(() => {
+    setResult(null);
+  }, [pickup, stops]);
 
   const loadAcceptedOrders = async () => {
     try {
@@ -167,39 +176,74 @@ const RoutePlanner: FunctionalComponent = () => {
 
   const handleSubmit = async () => {
     const payload: OptimizeRouteRequest = { pickup, stops };
+    setRouteError(null);
+    setResult(null);
+    if (!pickup.trim() || stops.some(stop => !stop.address.trim())) {
+      setRouteError("Enter a pickup location and an address for every delivery stop.");
+      return;
+    }
     setLoading(true);
     try {
       const data = await optimizeRoute(payload);
       setResult(data);
     } catch (error) {
       console.error("Route optimization failed:", error);
-      alert("Something went wrong.");
+      setRouteError(error instanceof Error ? error.message : "Could not generate the route.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = () => {
-    if (result) {
-      navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+  const saveSelectedRoute = async () => {
+    setRouteError(null);
+    const orders = acceptedOrders.filter(order => selectedOrderIds.has(order.id));
+    if (!routeName.trim() || !pickup.trim() || !orders.length ||
+        stops.length !== orders.length || stops.some((stop, i) => stop.address !== orders[i].delivery_address)) {
+      setRouteError("Enter a route name and pickup, then use selected accepted orders as stops before saving.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const route = await deliveryRouteApi.createFromRequests({
+        route_name: routeName.trim(), pickup_location: pickup.trim(),
+        delivery_date: new Date().toISOString(), request_ids: orders.map(order => order.id),
+      });
+      setSavedRoute(route);
+      setResult(null);
+    } catch (err) {
+      console.error("Could not save route", err);
+      setRouteError(err instanceof Error ? err.message : "Could not save the route.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 6 }, px: { xs: 1, sm: 3 } }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         Plan Your Delivery Route
       </Typography>
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Plan the stop order here, then open Google Maps or Apple Maps for directions.
+        Maps chooses the roads; distances and arrival times here are planning estimates.
+      </Alert>
+      {routeError && <Alert severity="error" sx={{ mb: 2 }}>{routeError}</Alert>}
+      {savedRoute && (
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+          <Typography variant="h6">{savedRoute.route_name} — saved</Typography>
+          <Typography sx={{ mb: 2 }}>Resume this itinerary later from Saved Routes.</Typography>
+          <DeliveryItinerary routeId={savedRoute.id} editable onProgress={() => {}} />
+          <Button onClick={() => setSavedRoute(null)} sx={{ mt: 2 }}>Plan another route</Button>
+        </Paper>
+      )}
 
       {/* Accepted Orders Panel */}
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={2}>
           <Typography variant="h6">
             Accepted Orders
           </Typography>
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <Button 
               variant="outlined" 
               size="small" 
@@ -342,6 +386,16 @@ const RoutePlanner: FunctionalComponent = () => {
             >
               {loading ? "Optimizing..." : "Generate Route"}
             </Button>
+            <TextField fullWidth label="Route name" value={routeName}
+              onChange={event => setRouteName(event.currentTarget.value)} sx={{ mt: 2 }} />
+            <Button fullWidth variant="outlined" disabled={loading || Boolean(savedRoute)}
+              onClick={saveSelectedRoute} sx={{ mt: 2, minHeight: 44 }}>
+              Save selected orders for delivery
+            </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Saving optimizes the selected accepted orders for today and stores progress online.
+              Manual-address previews below are not saved. Resume existing orders in Saved Routes instead of saving them twice.
+            </Typography>
           </Box>
           {result && (
             <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
@@ -349,67 +403,26 @@ const RoutePlanner: FunctionalComponent = () => {
                 Optimized Route
               </Typography>
               <MapboxRouteMap stops={result.stops} />
-              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  Route Details
-                  <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'}>
-                    <IconButton size="small" onClick={handleCopy} sx={{ ml: 1 }}>
-                      <ContentCopyIcon  />
-                    </IconButton>
-                  </Tooltip>
-                </Typography>
-                <Box
-                  sx={{
-                    bgcolor: '#1e1e1e',
-                    color: '#fff',
-                    borderRadius: 1,
-                    p: 2,
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    overflowX: 'auto',
-                    maxHeight: 300,
-                    width: '100%',
-                    boxSizing: 'border-box',
-                  }}
-                  component="pre"
-                >
-                  {JSON.stringify(result, null, 2)}
-                </Box>
-              </Box>
+              <Typography sx={{ mb: 2 }}>
+                Estimated {result.total_distance_miles.toFixed(1)} miles · {result.total_eta} minutes
+              </Typography>
+              <Alert severity="warning" sx={{ mb: 2 }}>Preview only. Save accepted orders above to retain delivery progress.</Alert>
+              <Stack spacing={2}>
+                {result.stops.map((stop, index) => (
+                  <Paper variant="outlined" key={index} sx={{ p: 2, overflowWrap: "anywhere" }}>
+                    <Typography fontWeight="bold" sx={{ mb: 1 }}>
+                      {index === 0 ? "Pickup" : `Stop ${index}`}: {stop.address}
+                    </Typography>
+                    <NavigationButtons destination={{
+                      address: stop.address, longitude: stop.location[0], latitude: stop.location[1],
+                    }} />
+                  </Paper>
+                ))}
+              </Stack>
             </Box>
           )}
         </Box>
       </Paper>
-      {/* On mobile, show the JSON result below everything */}
-      {result && (
-        <Box sx={{ mt: 4, display: { xs: 'block', md: 'none' } }}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-            Optimized Route Details
-            <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'}>
-              <IconButton size="small" onClick={handleCopy} sx={{ ml: 1 }}>
-                <ContentCopyIcon />
-              </IconButton>
-            </Tooltip>
-          </Typography>
-          <Box
-            sx={{
-              bgcolor: '#1e1e1e',
-              color: '#fff',
-              borderRadius: 1,
-              p: 2,
-              fontFamily: 'monospace',
-              fontSize: 14,
-              overflowX: 'auto',
-              maxHeight: 300,
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
-            component="pre"
-          >
-            {JSON.stringify(result, null, 2)}
-          </Box>
-        </Box>
-      )}
 
       {/* Confirmation Dialog for Removing Accepted Order */}
       <Dialog

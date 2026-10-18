@@ -1,5 +1,61 @@
 # Croprithm
 
+## Mobile-web delivery pilot
+
+Croprithm handles delivery planning and operator-confirmed progress. Google Maps
+and Apple Maps handle turn-by-turn navigation; no native mobile app, embedded
+navigation SDK, background GPS or automatic proof of delivery is provided.
+
+1. Accept produce requests, then open Route Planner.
+2. Select accepted orders, choose **Use Selected as Stops**, and enter a pickup
+   and route name. **Generate Route** shows an unsaved preview (manual addresses
+   also work). **Save selected orders for delivery** optimizes and saves today's
+   accepted-order itinerary to the backend.
+3. Open Google Maps or Apple Maps for a pickup or delivery stop. Coordinate
+   destinations are preferred; addresses are used when coordinates are missing
+   or invalid. The navigation provider starts from the user's current location
+   and may choose different roads, traffic estimates and arrival times.
+4. Return to Croprithm while safely parked to record **En route**, **Arrived**,
+   **Mark delivered**, **Skip stop**, or **Reset**. Opening Maps does not update
+   progress. Resume a saved itinerary from **Saved Routes > View Details**.
+5. Complete a route only after every stop is delivered. Skipped stops remain
+   unresolved; cancelled/completed routes cannot accept progress updates.
+
+An internet connection is required to save/load progress. Manual-address previews
+are not persistent. Saving selected orders recalculates their itinerary; inspect
+the saved order before navigation. Orders on non-cancelled routes cannot be
+scheduled again. Re-optimization is limited to planned routes with no recorded progress.
+All selected addresses must geocode successfully; failures no longer silently
+omit deliveries. Identical addresses retain separate order/stop identities.
+
+Stop progress is separate from order acceptance and does not automatically
+confirm fulfillment in Menurithm. Reliable cross-app delivery confirmation,
+offline synchronization, real-device pilot validation and native-app decisions
+are tracked in the [Croprithm Pilot Roadmap](https://github.com/users/brianmbeere/projects/3).
+Existing route metrics are planning estimates; assumed savings are not measured
+pilot outcomes. Passenger-car Maps directions are not truck-clearance routing.
+
+### Regression checks
+
+From the backend, using its configured Python environment:
+
+```bash
+python -m unittest test_delivery_workflow test_database_config -q
+```
+
+From the frontend (Node 22.6+ for the built-in TypeScript test runner):
+
+```bash
+node --experimental-strip-types --test tests/navigation.test.mjs
+VITE_BACKEND_URL=https://api.croprithm.com npm run build
+```
+
+For a credential-free visual check, run the Vite development server and open
+`/tests/itinerary.html`. This fixture uses in-memory fake deliveries, never calls
+the delivery backend, and is not included in the production build. Check details
+opening, provider links, progress, rejected premature completion and narrow
+screens. Actual Google/Apple app switching still needs real-device validation.
+
 ## Rebrand and custom domain rollout
 
 The canonical repository is [brianmbeere/croprithm](https://github.com/brianmbeere/croprithm).

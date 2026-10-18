@@ -82,6 +82,30 @@ export interface CreateDeliveryRoute {
   request_ids: number[];
 }
 
+export type StopStatus = "pending" | "en_route" | "arrived" | "delivered" | "skipped";
+
+export interface DeliveryStop {
+  id: number;
+  route_id: number;
+  request_id: number;
+  stop_order: number;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  status: StopStatus | "failed";
+  actual_arrival: string | null;
+}
+
+async function routeError(response: Response, message: string): Promise<never> {
+  if (!response.headers.get("Content-Type")?.includes("application/json")) {
+    throw new Error(`${message} (HTTP ${response.status}). Please retry.`);
+  }
+  const body: unknown = await response.json();
+  const detail = typeof body === "object" && body !== null && "detail" in body && typeof body.detail === "string"
+    ? body.detail : `${message} (HTTP ${response.status})`;
+  throw new Error(detail);
+}
+
 // Helper function to get auth headers
 async function getAuthHeaders(): Promise<HeadersInit> {
   const user = auth.currentUser;
@@ -277,7 +301,7 @@ export const deliveryRouteApi = {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to create route: ${response.statusText}`);
+      return routeError(response, "Failed to save route");
     }
     
     return response.json();
@@ -305,7 +329,7 @@ export const deliveryRouteApi = {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to update route status: ${response.statusText}`);
+      return routeError(response, "Failed to update route status");
     }
   },
 
@@ -317,12 +341,27 @@ export const deliveryRouteApi = {
     });
     
     if (!response.ok) {
-      // Fallback to active routes if /all endpoint doesn't exist
-      return this.getActiveRoutes();
+      return routeError(response, "Failed to load saved routes");
     }
     
     return response.json();
-  }
+  },
+
+  async getStops(routeId: number): Promise<DeliveryStop[]> {
+    const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/stops`, {
+      headers: await getAuthHeaders(),
+    });
+    if (!response.ok) return routeError(response, "Failed to load delivery stops");
+    return response.json();
+  },
+
+  async updateStopStatus(routeId: number, stopId: number, status: StopStatus): Promise<DeliveryStop> {
+    const response = await fetch(`${API_BASE_URL}/api/routes/${routeId}/stops/${stopId}/status`, {
+      method: "PUT", headers: await getAuthHeaders(), body: JSON.stringify({ status }),
+    });
+    if (!response.ok) return routeError(response, "Failed to save delivery progress");
+    return response.json();
+  },
 };
 
 // Analytics API
