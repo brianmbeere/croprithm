@@ -181,9 +181,9 @@ For the existing production data, use `DB_NAME=routecast` on the retained
 Menurithm instance and leave Menurithm on its existing `menurithm` database.
 The `_pilot` names above are fresh-install examples. The inspected live instances
 are Basic 256 MB, not legacy Starter: the 5 GB Menurithm instance is the smaller
-consolidation target. Retain the original 15 GB Routecast instance for rollback
-until the consolidated deployment is accepted; it continues to incur charges
-while running, and storage charges may remain while suspended.
+consolidation target. The original 15 GB Routecast instance was retained for
+cutover acceptance, then permanently deleted with user approval after private
+backup checksums and active applications were verified.
 
 #### Verified live layout (2026-10-18)
 
@@ -205,16 +205,19 @@ database-backed API reads, CORS for the static origin, SPA deep links, assets,
 and Mapbox origin access were verified. The user accepted both new frontends
 before the old paid frontends were suspended.
 
-The original Routecast Postgres instance is **suspended, not deleted**. Both APIs
-were verified again after its suspension. This stops its compute while retaining
-rollback data; storage charges may remain. Combined with the two suspended
-frontend services, approximately $20/month of compute was removed at current
-published rates. No database deletion is scheduled.
+The original Routecast Postgres instance and both old paid frontend services are
+**permanently deleted**, following explicit user approval. Both APIs, static sites
+and database reads were verified again after deletion. Approximately $20/month
+of compute plus the old database's allocated storage charges were removed at
+current published rates. The active shared instance and logical databases are
+unchanged.
 
-The old `routecast.onrender.com` frontend is unavailable, not redirected. Old
-database backups and the suspended database do not track new writes. To roll
-back after accepting writes, resume the old instance and pause writers while
-copying/reconciling the newest data; do not simply point the API at stale data.
+The old `routecast.onrender.com` frontend is unavailable, not redirected. The
+deleted database's Render-managed recovery history is no longer available.
+Private PostgreSQL 16 cutover dumps remain, with checksums verified before
+deletion, but do not track newer writes. Recovery into another instance requires
+provisioning a target and restoring a backup; pause writers and reconcile current
+data instead of overwriting newer writes with a stale cutover dump.
 
 Firebase's public configuration did not yet show `routecast-static.onrender.com`
 in `routecast-49fd2` authorized domains at verification time. Existing
@@ -230,8 +233,9 @@ The retained database instance is now named
 [`shared-pilot-postgres`](https://dashboard.render.com/d/dpg-d1b9okidbo4c73cal3o0-a)
 and belongs to **Shared Infrastructure / Production**, not either application's
 project. Routecast and Menurithm keep their separate app projects and
-GitHub-linked deployments. The original Routecast database and paid frontend
-remain suspended in Routecast's project for rollback.
+GitHub-linked deployments. The original Routecast database and both old paid
+frontends have been removed; the app projects contain only their active API and
+static site.
 
 The shared instance contains the separate `menurithm` and `routecast` logical
 databases. This was only a display-name/project move: the instance ID, existing
