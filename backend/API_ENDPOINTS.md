@@ -21,6 +21,7 @@ All routes below are rooted at `/api/fulfillment`.
 | POST | `/orders` | Customer: create request with method `customer_pickup` or `farmer_delivery`, quantity/unit, customer name, timezone-aware window start/end, optional requirements, delivery address when delivering |
 | GET | `/orders` | Customer's own orders and current agreement terms only |
 | GET | `/produce/available` | Authenticated Menurithm bridge: current available listings with farmer, quantity, unit, price and location; optional `produce_type`, `location` and `max_price` filters |
+| POST | `/marketplace/checkout-preview` | Authenticated customer: supply `lines` with distinct `listing_id` and positive decimal `quantity` (up to three fractional places). Rechecks one farm's published stock and prices. Returns the produce subtotal and `payment_status: "not_configured"`; no writes or Stripe calls. |
 | POST | `/orders/{id}/accept` | Customer: `{"revision": 1}` accepts the exact quote and reserves available stock; stale revisions or insufficient stock return 409 |
 | POST | `/orders/{id}/cancel` | Customer: cancel own order before handover and release any reservation |
 | GET | `/farmer/orders` | Farmer: unassigned and own orders |

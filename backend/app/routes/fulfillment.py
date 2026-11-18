@@ -1,7 +1,7 @@
 import hmac
 import os
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -16,6 +16,50 @@ from app.services.fulfillment import advance_handover, cancel_agreement, matchin
 
 router = APIRouter(prefix="/api/fulfillment", tags=["fulfillment"])
 Method = Literal["customer_pickup", "farmer_delivery"]
+
+
+class CartLine(BaseModel):
+    listing_id: int = Field(gt=0)
+    quantity: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
+
+
+class CartPreview(BaseModel):
+    lines: list[CartLine] = Field(min_length=1, max_length=50)
+
+
+def build_cart_preview(data: CartPreview, db: Session):
+    quantities = {line.listing_id: line.quantity for line in data.lines}
+    if len(quantities) != len(data.lines):
+        raise HTTPException(422, "Each listing can appear only once.")
+    listings = db.query(ProduceInventory).filter(
+        ProduceInventory.id.in_(quantities), ProduceInventory.is_available.is_(True)
+    ).options(joinedload(ProduceInventory.seller)).all()
+    if len(listings) != len(quantities):
+        raise HTTPException(409, "A listing is no longer available. Update your cart.")
+    if len({listing.seller_id for listing in listings}) != 1:
+        raise HTTPException(422, "Check out with one farm at a time.")
+    lines = []
+    subtotal = Decimal("0.00")
+    for listing in listings:
+        stock = Decimal(str(listing.quantity_available))
+        price = Decimal(str(listing.price_per_unit))
+        quantity = quantities[listing.id]
+        if not stock.is_finite() or stock < quantity:
+            raise HTTPException(409, f"Not enough {listing.produce_type} is available. Update your cart.")
+        if not price.is_finite() or not 0 <= price <= Decimal("99999999.99"):
+            raise HTTPException(409, f"{listing.produce_type} has no valid posted price.")
+        amount = (quantity * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        subtotal += amount
+        lines.append({
+            "listing_id": listing.id, "produce_type": listing.produce_type,
+            "quantity": str(quantity), "unit": listing.unit,
+            "unit_price": str(price), "line_total": str(amount),
+        })
+    return {
+        "seller_name": listings[0].seller.full_name, "currency": "USD",
+        "lines": lines, "produce_subtotal": str(subtotal),
+        "payment_provider": "stripe_connect", "payment_status": "not_configured",
+    }
 
 
 class OrderInput(BaseModel):
@@ -131,6 +175,11 @@ def customer_order(db: Session, identity: str, identifier: int):
     if not agreement:
         raise HTTPException(404, "Order not found")
     return agreement, db.get(ProduceRequest, agreement.request_id)
+
+
+@router.post("/marketplace/checkout-preview")
+def preview_checkout(data: CartPreview, _identity: str = Depends(customer_identity), db: Session = Depends(get_db)):
+    return build_cart_preview(data, db)
 
 
 @router.get("/produce/available")

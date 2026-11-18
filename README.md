@@ -44,6 +44,13 @@ Ordinary route progress and legacy **Mark delivered** do not confirm an order.
 
 ### Backend setup and deployment order
 
+The **Farm storefront** shows listing status and committed stock. Menurithm's
+checkout preview reads published stock and posted prices from Croprithm and
+reviews one farm's cart at a time. It does not create orders or reserve stock.
+Stripe Connect onboarding, checkout, refunds, and delayed transfers are not
+configured. Instant checkout also requires posted fulfillment windows and
+expiring stock reservations; keep the quote flow available for real orders.
+
 1. Back up the Croprithm logical database (internally named `routecast`).
 2. From `backend`, with its own `DATABASE_URL` / `DB_NAME`, run
    `python migrate_fulfillment.py`. This idempotently creates or adds the

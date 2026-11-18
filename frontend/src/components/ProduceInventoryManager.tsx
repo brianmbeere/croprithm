@@ -19,7 +19,8 @@ import {
   Chip,
   IconButton,
   Menu,
-  MenuItem
+  MenuItem,
+  Stack
 } from "@mui/material";
 import { AddIcon, EditIcon, DeleteIcon, MoreVertIcon } from "../components/SVGIcons";
 import { produceInventoryApi, type ProduceInventory } from "../api/produceApi";
@@ -219,16 +220,31 @@ const ProduceInventoryManager = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5">My Produce Inventory</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Produce
-        </Button>
-      </Box>
+      <Stack spacing={2} mb={3}>
+        <Box sx={{ bgcolor: 'primary.dark', color: 'primary.contrastText', borderRadius: 4, p: { xs: 3, md: 4 } }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+            <Box>
+              <Typography variant="overline">Croprithm seller workspace</Typography>
+              <Typography component="h1" variant="h4" fontWeight={750}>Farm storefront</Typography>
+              <Typography>Manage the produce, pricing, and stock restaurants see in Menurithm.</Typography>
+            </Box>
+            <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>Add listing</Button>
+          </Stack>
+        </Box>
+        <Grid container spacing={2}>
+          {[
+            ['Published and in stock', inventory.filter(item => item.is_available && item.quantity_available > 0).length],
+            ['With committed stock', inventory.filter(item => item.quantity_committed > 0).length],
+            ['Paused or sold out', inventory.filter(item => !item.is_available || item.quantity_available <= 0).length],
+          ].map(([label, count]) => <Grid key={label} size={{ xs: 12, sm: 4 }}>
+            <Card variant="outlined" sx={{ borderRadius: 3 }}><CardContent>
+              <Typography variant="body2" color="text.secondary">{label}</Typography>
+              <Typography variant="h5" fontWeight={750}>{count}</Typography>
+            </CardContent></Card>
+          </Grid>)}
+        </Grid>
+        <Alert severity="info">Stripe Connect onboarding and payouts are not configured. Existing orders still use quotes and direct payment.</Alert>
+      </Stack>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -237,7 +253,7 @@ const ProduceInventoryManager = () => {
       )}
 
       {inventory.length === 0 ? (
-        <Card>
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent sx={{ textAlign: 'center', py: 4 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No produce inventory yet

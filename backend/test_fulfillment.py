@@ -190,6 +190,36 @@ class FulfillmentTests(unittest.TestCase):
         with self.sessions() as db:
             self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 3)
 
+    def test_cart_preview_prices_live_listings_without_writing_orders_or_stock(self):
+        with self.sessions() as db:
+            db.add_all([
+                ProduceInventory(id=11, seller_id=1, produce_type="Onions", unit="lb", quantity_available=4,
+                                 price_per_unit=1.25, location="Farm", is_available=True),
+                ProduceInventory(id=12, seller_id=2, produce_type="Spinach", unit="lb", quantity_available=4,
+                                 price_per_unit=3, location="Other farm", is_available=True),
+            ])
+            db.commit()
+        endpoint = "/api/fulfillment/marketplace/checkout-preview"
+        line = {"listing_id": 10, "quantity": "2.5", "unit_price": "0.01"}
+        onions = {"listing_id": 11, "quantity": "0.1"}
+        result = self.client.post(endpoint, json={"lines": [line, onions]})
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()["produce_subtotal"], "8.88")
+        self.assertEqual(result.json()["payment_status"], "not_configured")
+        self.assertEqual(self.client.post(endpoint, json={"lines": [line, line]}).status_code, 422)
+        self.assertEqual(self.client.post(endpoint, json={"lines": [
+            line, {"listing_id": 12, "quantity": "1"},
+        ]}).status_code, 422)
+        self.assertEqual(self.client.post(endpoint, json={"lines": [
+            {**line, "quantity": "11"},
+        ]}).status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 10)
+            self.assertEqual(db.query(FulfillmentAgreement).count(), 0)
+            db.get(ProduceInventory, 11).is_available = False
+            db.commit()
+        self.assertEqual(self.client.post(endpoint, json={"lines": [onions]}).status_code, 409)
+
     def test_only_fulfilling_farmer_can_record_payment_after_handover(self):
         order = self.create()
         self.assertEqual(self.quote(order).status_code, 200)
