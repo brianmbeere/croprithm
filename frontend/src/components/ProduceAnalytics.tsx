@@ -91,9 +91,9 @@ const ProduceAnalytics = () => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Market Analytics
-      </Typography>
+      <Box mb={3}>
+        <WorkspaceHeading title="Market analytics" description="Review marketplace activity, available listings, and demand trends." />
+      </Box>
 
       {/* Market Overview */}
       {marketInsights && (
@@ -253,3 +253,4 @@ const ProduceAnalytics = () => {
 };
 
 export default ProduceAnalytics;
+import { WorkspaceHeading } from "./WorkspaceUI";

@@ -1,127 +1,134 @@
-import { Button, Card, CardContent, Container, Grid, Typography, Box } from "@mui/material";
-import { motion } from "framer-motion";
-import { type FunctionalComponent } from "preact";
-import { brandPalette } from "../branding";
-const logoLanding = "/croprithm-logo.svg";
+import "./LandingPage.css";
 
-const LandingPage: FunctionalComponent = () => {
+const steps = [
+  {
+    title: "Count your harvest",
+    description: "See what’s on hand, what’s available to sell, and what’s already committed to orders.",
+    icon: <><path d="M4 10h16v10H4zM3 6h18v4H3zM10 14h4" /></>,
+  },
+  {
+    title: "List it for restaurants",
+    description: "Publish what’s available, set a price and pickup window, and let restaurants order through Menurithm.",
+    icon: <><path d="M4 20V9l3-5h10l3 5v11H4zM4 10h16m-11 0 1-6m5 6-1-6m-4 16v-5h4v5" /></>,
+  },
+  {
+    title: "Get orders ready",
+    description: "Review incoming orders, mark produce ready, and record collection. Restaurants pay you at pickup.",
+    icon: <><path d="M8 5H5v16h14V5h-3M8 3h8v4H8zM8 13l3 3 5-5" /></>,
+  },
+];
+
+const questions = [
+  {
+    question: "Where do restaurants place orders?",
+    answer: "Restaurants browse published farm listings and place pickup orders in Menurithm. Farmers manage their listings and orders in Croprithm.",
+  },
+  {
+    question: "Do I need to approve every pickup order?",
+    answer: "No. Restaurants can order in-stock produce at your posted price when you have an upcoming pickup window. The order commits stock when it is placed, not when it is added to a cart.",
+  },
+  {
+    question: "How do I get paid?",
+    answer: "Restaurants pay you directly at pickup. You can record payment in Croprithm after collection. Croprithm does not collect online payments.",
+  },
+];
+
+export default function LandingPage() {
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background: brandPalette.background.default,
-        color: brandPalette.text.primary,
-        display: "flex",
-        flexDirection: "column",
-        boxSizing: "border-box",
-        overflowX: "hidden",
-      }}
-    >
-      {/* Sticky Header */}
-      <Box
-        component="header"
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-          backgroundColor: brandPalette.background.paper,
-          borderBottom: `1px solid ${brandPalette.accent.main}`,
-          px: { xs: 2, md: 4 },
-          py: 2,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box component="img" src={logoLanding} alt="Croprithm Logo" sx={{ height: { xs: 30, md: 42 }, maxWidth: { xs: 140, md: 220 }, background: "transparent" }} />
-        </Box>
-        <Button
-          variant="contained"
-          href="/signin"
-          sx={{
-            background: brandPalette.primary.main,
-            color: brandPalette.primary.contrastText,
-            fontWeight: 700,
-            borderRadius: 2,
-            px: 3,
-            boxShadow: "0 2px 8px rgba(58,131,116,0.08)",
-            ':hover': {
-              background: brandPalette.secondary.main,
-              color: brandPalette.secondary.contrastText,
-            },
-          }}
-        >
-          Get Started
-        </Button>
-      </Box>
+    <div className="crop-landing">
+      <header className="crop-header">
+        <div className="crop-shell crop-nav">
+          <a className="crop-brand" href="/">
+            <img src="/croprithm-icon.svg" alt="" width="34" height="34" />
+            Croprithm
+          </a>
+          <nav aria-label="Main navigation">
+            <a className="crop-nav-guide" href="#how-it-works">How it works</a>
+            <a className="crop-button crop-button-outline" href="/signin">Sign in</a>
+          </nav>
+        </div>
+      </header>
 
-      {/* Hero Section */}
-      <Container maxWidth="md" sx={{ py: 8, textAlign: "center" }}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7 }}
-        >
-          <Typography variant="overline" color="primary">From your farm. On your terms.</Typography>
-          <Typography variant="h1" sx={{ my: 3 }}>Good produce deserves<br />a better handover.</Typography>
-          <Typography variant="h6" color={brandPalette.text.secondary} sx={{ maxWidth: 600, mx: "auto" }}>
-            Manage your harvest, quote farmer delivery or customer pickup, and keep every handover clear. Built for farmers who care about the condition their produce arrives in.
-          </Typography>
-          <Button variant="contained" size="large" href="/signin" sx={{ mt: 4, background: brandPalette.primary.main, color: brandPalette.primary.contrastText, fontWeight: 700, borderRadius: 2, px: 4, fontSize: 20, boxShadow: "0 2px 8px rgba(58,131,116,0.08)", ':hover': { background: brandPalette.secondary.main, color: brandPalette.secondary.contrastText } }}>
-            Open farmer workspace
-          </Button>
-        </motion.div>
-      </Container>
+      <main>
+        <section className="crop-shell crop-hero" aria-labelledby="crop-hero-title">
+          <div className="crop-hero-copy">
+            <p className="crop-eyebrow">The marketplace for growers</p>
+            <h1 id="crop-hero-title">Sell your harvest to <em>local kitchens.</em></h1>
+            <p className="crop-intro">Track what you have, set your prices and pickup times, and sell to restaurants shopping on Menurithm.</p>
+            <div className="crop-actions">
+              <a className="crop-button crop-button-primary" href="/signup">Create a farmer account <span aria-hidden="true">→</span></a>
+              <a className="crop-text-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
+            </div>
+            <a className="crop-buyer-shortcut crop-text-link" href="#for-restaurants">Buying for a restaurant? <span aria-hidden="true">↓</span></a>
+          </div>
+          <figure className="crop-hero-art">
+            <img src="/farm-to-kitchen.svg" width="720" height="570" fetchPriority="high"
+              alt="Illustration of a crate of fresh vegetables in front of rolling farm fields" />
+          </figure>
+        </section>
 
-      {/* Features Section */}
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Typography variant="h4" fontWeight="bold" color={brandPalette.primary.main} align="center" gutterBottom sx={{ mb: 6 }}>
-          Why Croprithm?
-        </Typography>
-        <Grid container spacing={4}>
-          {[
-            {
-              title: "Choose the right handover",
-              desc: "Offer customer pickup with no delivery fee, or deliver it yourself. Quote the terms and wait for customer approval.",
-            },
-            {
-              title: "Keep your harvest in view",
-              desc: "Manage produce availability and quality details in your farmer inventory. Keep customers informed as orders become ready.",
-            },
-            {
-              title: "Plan here. Navigate with Maps.",
-              desc: "Save delivery stops, open Google Maps or Apple Maps for directions, and return to record progress. No dedicated navigation app required.",
-            },
-          ].map((feature, index) => (
-            <Grid key={index} size={{ xs: 12, md: 4 }}>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-                style={{ height: "100%" }}
-              >
-                <Card elevation={3} sx={{ height: "100%", borderRadius: 3, background: brandPalette.background.paper }}>
-                  <CardContent>
-                    <Typography variant="h6" fontWeight="bold" color={brandPalette.secondary.main} gutterBottom>
-                      {feature.title}
-                    </Typography>
-                    <Typography variant="body1" color={brandPalette.text.primary}>{feature.desc}</Typography>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
+        <section className="crop-workflow" id="how-it-works" aria-labelledby="crop-workflow-title">
+          <div className="crop-shell">
+            <p className="crop-eyebrow">How it works</p>
+            <h2 id="crop-workflow-title">From harvest to handoff</h2>
+            <ol className="crop-steps">
+              {steps.map(({ title, description, icon }, index) => (
+                <li key={title}>
+                  <div className="crop-step-top">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
+                    <span aria-hidden="true">0{index + 1}</span>
+                  </div>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-      {/* Footer */}
-      <Box component="footer" sx={{ textAlign: "center", py: 4, color: brandPalette.text.secondary, fontWeight: 500, letterSpacing: 1 }}>
-        © {new Date().getFullYear()} Croprithm. All rights reserved.
-      </Box>
-    </Box>
+        <section className="crop-shell crop-kitchen" id="for-restaurants" aria-labelledby="crop-kitchen-title">
+          <div className="crop-kitchen-copy">
+            <p className="crop-eyebrow">For restaurants</p>
+            <h2 id="crop-kitchen-title">Buying for a restaurant?</h2>
+            <p>See what farms have available, check the price per unit, and choose a pickup window in Menurithm. Pay the farmer when you collect your order.</p>
+            <a className="crop-button crop-button-outline" href="https://menurithm.com/dashboard/produce-orders">Shop on Menurithm <span aria-hidden="true">↗</span></a>
+          </div>
+          <figure className="crop-example">
+            <figcaption className="crop-eyebrow">Example listing · not live stock</figcaption>
+            <div className="crop-example-product">
+              <span className="crop-example-art" aria-hidden="true">🍅</span>
+              <div>
+                <h3>Roma tomatoes</h3>
+                <p><strong>$3.00</strong> / lb</p>
+              </div>
+            </div>
+            <dl>
+              <div><dt>Available</dt><dd>24 lb</dd></div>
+              <div><dt>Pickup</dt><dd>Saturday, 9–11 a.m.</dd></div>
+              <div><dt>Payment</dt><dd>Pay at pickup</dd></div>
+            </dl>
+          </figure>
+        </section>
+
+        <section className="crop-faq" aria-labelledby="crop-faq-title">
+          <div className="crop-shell crop-faq-inner">
+            <h2 id="crop-faq-title">Before your first order</h2>
+            <div>
+              {questions.map(({ question, answer }) => (
+                <details key={question}>
+                  <summary>{question}</summary>
+                  <p>{answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="crop-footer">
+        <div className="crop-shell">© {new Date().getFullYear()} Croprithm</div>
+      </footer>
+    </div>
   );
-};
-
-export default LandingPage;
+}

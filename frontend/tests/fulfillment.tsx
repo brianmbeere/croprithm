@@ -1,9 +1,15 @@
 import { render } from 'preact';
+import { useState } from 'preact/hooks';
 import { CssBaseline, ThemeProvider, Box } from '@mui/material';
 import { auth } from '../src/hooks/initializeFirebase';
 import { theme } from '../src/branding';
 import FulfillmentOrders from '../src/components/FulfillmentOrders';
 import ProduceInventoryManager from '../src/components/ProduceInventoryManager';
+import WorkspaceLayout from '../src/components/WorkspaceLayout';
+import { WorkspaceHeading } from '../src/components/WorkspaceUI';
+import type { WorkspacePage } from '../src/components/workspaceSections';
+import RoutePlanner from '../src/pages/RoutePlanner';
+import { SelectedRequestsProvider } from '../src/context/SelectedRequestsContext';
 
 await auth.authStateReady();
 Object.defineProperty(auth, 'currentUser', { get: () => ({ getIdToken: async () => 'fixture-only' }) });
@@ -16,7 +22,7 @@ const order = {
   produce_inventory_id: null, produce_total: null, sale_total: null, seller_id: null,
 };
 const originalFetch = window.fetch.bind(window);
-const inventoryFixture = new URLSearchParams(location.search).has('inventory');
+const params = new URLSearchParams(location.search);
 const listing = {
   id: 1, produce_type: 'Tomatoes', quantity_available: 20, quantity_committed: 0,
   unit: 'kg', price_per_unit: 3, location: 'Fixture farm', is_available: true, organic: false,
@@ -32,6 +38,10 @@ window.fetch = async (input, init) => {
     return Response.json(listing);
   }
   if (String(input).endsWith('/api/produce/inventory')) return Response.json([listing]);
+  if (String(input).endsWith('/api/fulfillment/marketplace/farmer/pickup-windows')) return Response.json([]);
+  if (params.has('workspace') && String(input).startsWith('https://example.com/')) {
+    if (!String(input).includes('/api/fulfillment/')) return Response.json([]);
+  }
   if (!String(input).includes('/api/fulfillment/')) return originalFetch(input, init);
   if (init?.method === 'PUT') {
     const body = JSON.parse(String(init.body));
@@ -41,8 +51,15 @@ window.fetch = async (input, init) => {
   }
   return Response.json([order]);
 };
+function WorkspaceFixture() {
+  const [page, setPage] = useState<WorkspacePage>('overview');
+  return <SelectedRequestsProvider><WorkspaceLayout role="farmer" page={page} onPageChange={setPage} onLogout={() => {}}>
+    {page === 'inventory' ? <ProduceInventoryManager /> : page === 'orders' ? <FulfillmentOrders />
+      : page === 'plan' ? <RoutePlanner /> : <WorkspaceHeading title="Workspace fixture" description="Test the workspace navigation." />}
+  </WorkspaceLayout></SelectedRequestsProvider>;
+}
 const root = document.getElementById('fixture');
 if (!root) throw new Error('Missing fixture root');
-render(<ThemeProvider theme={theme}><CssBaseline /><Box sx={{ p: 2, maxWidth: 1200, mx: 'auto' }}>
-  {inventoryFixture ? <ProduceInventoryManager /> : <FulfillmentOrders />}
-</Box></ThemeProvider>, root);
+render(<ThemeProvider theme={theme}><CssBaseline />{params.has('workspace') ? <WorkspaceFixture />
+  : <Box sx={{ p: 2, maxWidth: 1200, mx: 'auto' }}>{params.has('inventory') ? <ProduceInventoryManager /> : <FulfillmentOrders />}</Box>}
+</ThemeProvider>, root);

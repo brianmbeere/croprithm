@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="570" viewBox="0 0 720 570">
+  <defs>
+    <pattern id="grain" width="13" height="13" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="3" r=".7" fill="#203b31" opacity=".16"/>
+      <circle cx="9" cy="8" r=".5" fill="#fffdf7" opacity=".52"/>
+    </pattern>
+    <g id="tomato">
+      <path d="M0-29c29-16 58 8 53 36-4 28-28 42-53 34-28 8-53-5-56-33-3-30 27-51 56-37Z" fill="#d55b40"/>
+      <path d="M-39 4c0-15 10-24 20-26" fill="none" stroke="#f59a69" stroke-width="5" stroke-linecap="round"/>
+      <path d="m0-31 6-14 3 14 22 3-19 8 6 12L0-17l-15 9 5-15-16-6Z" fill="#395d43"/>
+    </g>
+  </defs>
+  <path fill="#f3e5c4" d="M0 0h720v570H0z"/>
+  <circle cx="521" cy="144" r="87" fill="#f3bc61"/>
+  <path d="M0 248c105-73 184-72 283-29 102 45 147 47 230 13 78-32 145-38 207-21v359H0Z" fill="#adc09b"/>
+  <path d="M0 310c134-102 253-89 388-30 93 41 218 49 332-1v291H0Z" fill="#799972"/>
+  <path d="M0 351c151-57 252-45 356-3 100 40 242 55 364-7v229H0Z" fill="#557a56"/>
+  <g fill="none" stroke="#bfd09b" stroke-width="3" opacity=".8">
+    <path d="M0 326c183-84 284-52 375-15s232 54 345 3"/>
+    <path d="M0 365c150-55 266-45 363-4s239 56 357 2"/>
+    <path d="M0 398c142-52 254-43 358-6s234 52 362 5"/>
+    <path d="M0 432c97-34 180-45 261-36m241 39c77 12 147 11 218-10"/>
+  </g>
+  <path d="M0 0h720v570H0z" fill="url(#grain)"/>
+  <g fill="none" stroke="#385e46" stroke-linecap="round" stroke-width="3">
+    <path d="M109 117q11-10 20 1 11-10 21-1m28 30q9-8 17 2 9-9 17-2"/>
+    <path d="M608 106q8-8 16 1 9-8 17-1"/>
+  </g>
+  <ellipse cx="371" cy="492" rx="226" ry="25" fill="#234533" opacity=".42"/>
+  <path d="m177 342 52-45h293l46 45-201 74Z" fill="#745039"/>
+  <g transform="rotate(15 430 320)">
+    <path d="M423 304c-26-42-76-61-65-110 8-38 47-42 64-71 15 26 44 24 61 48 28 41-13 100-60 133Z" fill="#37674e"/>
+    <path d="M424 309c-4-55 2-93 1-155m0 103c-17-20-35-32-53-43m53 15c18-14 32-27 44-46" fill="none" stroke="#95b777" stroke-width="5" stroke-linecap="round"/>
+    <path d="M471 316c-3-34 17-62 50-78 3 40-12 69-50 78Z" fill="#6b955d"/>
+  </g>
+  <g transform="rotate(-23 303 288)">
+    <path d="M310 273c14-23 45-32 63-24-11 20-32 31-63 30m1-5c-19-20-14-50 2-67 15 24 15 47-2 67m-1 1c-28-15-47-21-66-12 14 19 41 23 66 12" fill="#5c875a"/>
+    <path d="M287 283c19-20 45-17 55 0 12 27-19 72-69 114-11 7-14-2-12-10 4-46 9-84 26-104Z" fill="#e58a40"/>
+    <path d="m272 322 17 5m15-34 15 5m-38 58 14 5" fill="none" stroke="#a7492b" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <use href="#tomato" transform="translate(458 328) rotate(13)"/>
+  <use href="#tomato" transform="translate(259 337) rotate(-17) scale(.8)"/>
+  <use href="#tomato" transform="translate(371 347) rotate(5) scale(.94)"/>
+  <path d="m177 342 48 21 24 125-50-31Z" fill="#b8794a"/>
+  <path d="m225 363 343-21-28 126-291 20Z" fill="#dda468"/>
+  <path d="m233 407 325-21-8 34-311 22Z" fill="#bc7f4c"/>
+  <path d="m187 389 46 18 6 35-45-24Z" fill="#9b653f"/>
+  <path d="m233 407 325-21m-319 56 311-22m-303 59 294-21" fill="none" stroke="#8c5639" stroke-width="3" opacity=".7"/>
+  <path d="m177 342 48 21 343-21" fill="none" stroke="#f5c990" stroke-width="6" stroke-linejoin="round"/>
+  <g fill="#6f4a35">
+    <circle cx="255" cy="382" r="3"/><circle cx="267" cy="465" r="3"/>
+    <circle cx="535" cy="364" r="3"/><circle cx="517" cy="446" r="3"/>
+  </g>
+  <path d="M348 432c0-14 12-24 30-23-1 18-12 27-30 23Zm0 0c-13 1-24-5-26-17 13-2 24 4 26 17Zm0 0 2 10" fill="none" stroke="#684630" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="none" stroke="#e4d7a9" stroke-linecap="round" stroke-width="3">
+    <path d="M94 483c-1-20-7-32-15-45m15 26c-7-10-17-13-24-13m26 20c1-10 5-16 11-19"/>
+    <path d="M609 479c1-22 8-38 16-48m-15 29c7-8 15-10 22-10m-22 18c-2-11-7-18-13-22"/>
+  </g>
+</svg>

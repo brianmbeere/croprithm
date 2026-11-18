@@ -30,7 +30,7 @@ import { produceRequestApi, deliveryRouteApi, type DeliveryRoute, type ProduceRe
 import StopInputList from "../components/route/StopInputList";
 import MapboxRouteMap from "../components/route/MapboxRouteMap";
 import AutocompleteTextField from "../components/route/AutoCompleteTextField";
-import { DeleteIcon } from '../components/SVGIcons';
+import { WorkspaceHeading, WorkspaceIcon } from '../components/WorkspaceUI';
 import NavigationButtons from "../components/route/NavigationButtons";
 import DeliveryItinerary from "../components/route/DeliveryItinerary";
 
@@ -219,14 +219,11 @@ const RoutePlanner: FunctionalComponent = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 6 }, px: { xs: 1, sm: 3 } }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Plan Your Delivery Route
-      </Typography>
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Plan the stop order here, then open Google Maps or Apple Maps for directions.
-        Maps chooses the roads; distances and arrival times here are planning estimates.
-      </Alert>
+    <Container maxWidth={false} disableGutters sx={{ maxWidth: 1200 }}>
+      <Box sx={{ mb: 3 }}>
+        <WorkspaceHeading title="Plan a delivery route"
+          description="Organize your stops here, then open Google Maps or Apple Maps for directions. Distances and arrival times are estimates." />
+      </Box>
       {routeError && <Alert severity="error" sx={{ mb: 2 }}>{routeError}</Alert>}
       {savedRoute && (
         <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
@@ -238,10 +235,10 @@ const RoutePlanner: FunctionalComponent = () => {
       )}
 
       {/* Accepted Orders Panel */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
         <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={2}>
           <Typography variant="h6">
-            Accepted Orders
+            Approved delivery orders
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <Button 
@@ -331,7 +328,7 @@ const RoutePlanner: FunctionalComponent = () => {
                     {removingOrderId === order.id ? (
                       <CircularProgress size={18} color="inherit" />
                     ) : (
-                      <DeleteIcon />
+                      <WorkspaceIcon name="delete" />
                     )}
                   </IconButton>
                 </Tooltip>

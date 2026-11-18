@@ -6,6 +6,7 @@ import {
 import { auth } from '../hooks/initializeFirebase';
 import { BASE_URL } from '../utils';
 import { produceInventoryApi, type ProduceInventory } from '../api/produceApi';
+import { WorkspaceHeading, WorkspaceIcon } from './WorkspaceUI';
 
 interface Order {
   pickup_checkout_id?: number | null;
@@ -46,6 +47,7 @@ export default function FulfillmentOrders() {
   const [windows, setWindows] = useState<PickupWindow[]>([]);
   const [windowForm, setWindowForm] = useState({ address: '', starts_at: '', ends_at: '' });
   const [showWindows, setShowWindows] = useState(false);
+  const [filter, setFilter] = useState("all");
   const windowPath = 'marketplace/farmer/pickup-windows';
 
   const manageWindows = async (action: 'load' | 'post' | number) => {
@@ -125,18 +127,25 @@ export default function FulfillmentOrders() {
     } finally { setBusy(false); }
   };
 
+  const groups = [
+    { id: "all", label: "All orders", matches: (_order: Order) => true },
+    { id: "quotes", label: "Requests & quotes", matches: (order: Order) => ["requested", "quoted"].includes(order.stage) },
+    { id: "handover", label: "To prepare or hand over", matches: (order: Order) => ["accepted", "ready"].includes(order.stage) },
+    { id: "completed", label: "Completed", matches: (order: Order) => ["collected", "delivered"].includes(order.stage) },
+    { id: "canceled", label: "Canceled", matches: (order: Order) => order.stage === "canceled" },
+  ];
+  const visible = orders.filter(groups.find(group => group.id === filter)?.matches ?? groups[0].matches);
+
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="overline" color="primary">Farmer workspace</Typography>
-        <Typography variant="h4">Orders & handovers</Typography>
-        <Typography color="text.secondary">Your produce. Your standards. Offer customer pickup or deliver it yourself.</Typography>
-      </Box>
-      <Alert severity="info">Quote produce and delivery in USD. Stock is reserved when the customer accepts. Collect payment directly, then record it here after handover. Croprithm does not process payments.</Alert>
+      <WorkspaceHeading title="Orders & handovers"
+        description="Prepare pickup orders, respond to quote requests, and record handover and direct payment."
+        actions={<Button variant="contained" startIcon={<WorkspaceIcon name="calendar" />} disabled={busy}
+          aria-expanded={showWindows} aria-controls={showWindows ? "pickup-window-panel" : undefined}
+          onClick={() => showWindows ? setShowWindows(false) : void manageWindows('load')}>Manage pickup windows</Button>} />
       {error && <Alert severity="error" role="alert">{error}</Alert>}
       {notice && <Alert severity="success" role="status">{notice}</Alert>}
-      <Box><Button variant="outlined" disabled={busy} onClick={() => void manageWindows('load')}>Manage pickup windows</Button></Box>
-      {showWindows && <Card variant="outlined"><CardContent><Stack spacing={2}>
+      {showWindows && <Card id="pickup-window-panel" variant="outlined"><CardContent><Stack spacing={2}>
         <Typography variant="h6">Pickup windows</Typography>
         <Typography variant="body2">Posting a window lets restaurants order your published, in-stock listings at their posted prices and pay you at pickup. A window can serve multiple orders. Pausing it stops new orders without changing existing ones.</Typography>
         <Stack component="form" spacing={2} onSubmit={event => { event.preventDefault(); void manageWindows('post'); }}>
@@ -160,17 +169,27 @@ export default function FulfillmentOrders() {
           {window.active ? <Button disabled={busy} onClick={() => void manageWindows(window.id)}>Pause</Button> : <Chip label="Paused" />}
         </Stack>)}
       </Stack></CardContent></Card>}
-      <Box><Button variant="outlined" disabled={loading || busy} onClick={refresh}>Refresh orders</Button></Box>
-      {loading ? <CircularProgress aria-label="Loading orders" /> : orders.length === 0 && !error ?
-        <Card><CardContent><Typography variant="h6">Your next harvest starts here</Typography><Typography color="text.secondary">New customer requests will appear here. Keep your produce inventory current while you wait.</Typography></CardContent></Card> : null}
-      {orders.map(order => {
+      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} justifyContent="space-between">
+        <TextField select size="small" label="Order status" value={filter} sx={{ minWidth: { sm: 240 } }}
+          onChange={event => setFilter((event.target as HTMLInputElement).value)}>
+          {groups.map(group => <MenuItem key={group.id} value={group.id}>{group.label}</MenuItem>)}
+        </TextField>
+        <Button variant="outlined" startIcon={<WorkspaceIcon name="refresh" />} disabled={loading || busy} onClick={refresh}>Refresh orders</Button>
+      </Stack>
+      {loading ? <CircularProgress aria-label="Loading orders" /> : visible.length === 0 && !error ?
+        <Card variant="outlined"><CardContent>
+          <Typography variant="h6">{orders.length ? "No orders match this status" : "No orders yet"}</Typography>
+          <Typography color="text.secondary">{orders.length ? "Choose another status to see more orders." : "Pickup orders and customer requests will appear here."}</Typography>
+          {filter !== "all" && <Button onClick={() => setFilter("all")}>Show all orders</Button>}
+        </CardContent></Card> : null}
+      {!loading && visible.map(order => {
         const draft = drafts[order.id];
         const canQuote = ['requested', 'quoted'].includes(order.stage);
         const completed = ['collected', 'delivered'].includes(order.stage);
         const matchingStock = inventory.filter(item => item.is_available && item.quantity_available >= order.quantity_needed
           && item.produce_type.trim().toLowerCase() === order.produce_type.trim().toLowerCase()
           && item.unit.trim().toLowerCase() === order.unit.trim().toLowerCase());
-        return <Card key={order.id}><CardContent>
+        return <Card key={order.id} variant="outlined"><CardContent>
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" gap={1} flexWrap="wrap">
               <Box><Typography variant="h6">{order.quantity_needed} {order.unit} {order.produce_type}</Typography>
@@ -186,7 +205,7 @@ export default function FulfillmentOrders() {
                 sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                 {!order.produce_inventory_id && <TextField select required label="Stock listing"
                   value={draft.produce_inventory_id}
-                  helperText={matchingStock.length ? 'Select the stock that will fulfill this request.' : 'Add enough matching stock in My Inventory first.'}
+                  helperText={matchingStock.length ? 'Select the stock that will fulfill this request.' : 'Add enough matching stock in Inventory first.'}
                   onChange={event => {
                     const listing = matchingStock.find(item => item.id === Number((event.target as HTMLInputElement).value));
                     if (listing) setDrafts(previous => ({ ...previous, [order.id]: {

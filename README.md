@@ -1,9 +1,26 @@
 # Croprithm
 
+## Landing page
+
+The public homepage introduces the farmer workflow and links to sign-in,
+farmer registration, and the Menurithm produce marketplace. The restaurant
+section shows a labeled example listing, not live inventory, and the FAQ
+explains when stock is committed and how pay-at-pickup works. The hero uses
+an original, locally hosted [farm illustration](frontend/public/farm-to-kitchen.svg).
+To swap in a farm photo, add an owned or appropriately licensed image to
+`frontend/public` and update the `src`, dimensions, and alt text in
+[LandingPage.tsx](frontend/src/pages/LandingPage.tsx). Use a landscape image
+close to the 720:570 aspect ratio to avoid excessive cropping.
+
 ## Farmer fulfillment pilot
 
 The refreshed interface uses the logo's `#3A8374` green for primary actions
 and selection accents, with readable contrasting text and neutral surfaces.
+Farmers start on **Overview**, with shortcuts to **Inventory**, **Orders &
+handovers**, and route planning. The sidebar groups work under **Farm**,
+**Delivery**, and **Manage**. Inventory supports searching and filtering
+listings, with available, committed, and on-hand quantities shown separately.
+Orders can be filtered by status; manage pickup windows from the orders header.
 
 New orders use **customer pickup** or **farmer delivery**, not third-party
 dispatch. Customers create requests in Menurithm's **Produce orders** workspace
@@ -20,7 +37,7 @@ are rejected. Accepted terms are locked against further editing.
 Requests and quotes do not hold stock. Accepting a new quote moves the order's
 quantity from available to committed. Either party can cancel before handover
 to release it. Handover removes the commitment without deducting available
-stock again. In **My Inventory**, farmers can see available, committed and
+stock again. In **Inventory**, farmers can see available, committed and
 on-hand stock and update the available count without editing listing details.
 Customers pay farmers directly. After handover, the assigned farmer can record
 that payment was received; neither app collects money or handles refunds.
@@ -89,6 +106,8 @@ Run `python -m unittest test_fulfillment test_delivery_workflow test_database_co
 from the backend. The dev-only `/tests/fulfillment.html` frontend fixture checks
 farmer quoting without credentials or real orders; the Menurithm counterpart
 checks customer request/approval and responsive navigation. Neither is bundled.
+Add `?workspace` to the Croprithm fixture to exercise the sidebar, inventory,
+orders, and route planning with mock data.
 Physical-device validation remains open in issue 22. Reassignment,
 online checkout, notifications and dedicated driver
 operations are future work in issue 28.

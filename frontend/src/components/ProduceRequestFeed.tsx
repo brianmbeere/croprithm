@@ -125,12 +125,12 @@ const ProduceRequestFeed = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" gutterBottom>Legacy produce requests</Typography>
-        <Alert severity="info" sx={{ mb: 2 }}>Historical requests use the original workflow. New customer pickup and farmer delivery requests are managed in Orders & handovers.</Alert>
-        <Button onClick={loadRequests} variant="outlined" size="small">
+      <Box mb={3}>
+        <WorkspaceHeading title="Legacy produce requests"
+          description="Review historical requests here. New requests are managed in Orders & handovers."
+          actions={<Button onClick={loadRequests} variant="outlined" startIcon={<WorkspaceIcon name="refresh" />}>
           Refresh
-        </Button>
+        </Button>} />
       </Box>
       
       {requests.length === 0 ? (
@@ -228,3 +228,4 @@ const ProduceRequestFeed = () => {
 };
 
 export default ProduceRequestFeed;
+import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";

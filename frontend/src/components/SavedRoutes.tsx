@@ -21,7 +21,7 @@ import {
   Paper,
   Grid,
 } from "@mui/material";
-import { MoreVertIcon, DeleteIcon } from "./SVGIcons";
+import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
 import { deliveryRouteApi, type DeliveryRoute } from "../api/produceApi";
 import DeliveryItinerary from "./route/DeliveryItinerary";
 import NavigationButtons from "./route/NavigationButtons";
@@ -194,16 +194,16 @@ const SavedRoutes = () => {
 
   return (
     <Box>
-      <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={3}>
-        <Typography variant="h5">Saved Routes & Delivery History</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button onClick={loadRoutes} variant="outlined" size="small">
+      <Box mb={3}>
+        <WorkspaceHeading title="Saved routes" description="Resume a saved itinerary or review your delivery history."
+          actions={<Stack direction="row" spacing={1}>
+          <Button onClick={loadRoutes} variant="outlined" size="small" startIcon={<WorkspaceIcon name="refresh" />}>
             Refresh
           </Button>
           <Button onClick={exportMetricsReport} variant="contained" size="small" color="secondary">
             Export Report
           </Button>
-        </Stack>
+        </Stack>} />
       </Box>
 
       {error && (
@@ -213,7 +213,7 @@ const SavedRoutes = () => {
       )}
 
       {/* Metrics Dashboard */}
-      <Paper elevation={2} sx={{ p: 3, mb: 4, bgcolor: "background.paper" }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 4, bgcolor: "background.paper" }}>
         <Typography variant="h6" gutterBottom>
           Route Optimization Metrics
         </Typography>
@@ -353,8 +353,8 @@ const SavedRoutes = () => {
                         color={getStatusColor(route.status)}
                         size="small"
                       />
-                      <IconButton size="small" onClick={(e) => handleMenuOpen(e, route)}>
-                        <MoreVertIcon />
+                      <IconButton aria-label={`Actions for ${route.route_name}`} aria-haspopup="menu" onClick={(e) => handleMenuOpen(e, route)}>
+                        <WorkspaceIcon name="more" />
                       </IconButton>
                     </Stack>
                   </Box>
@@ -437,7 +437,7 @@ const SavedRoutes = () => {
           onClick={() => selectedRoute && handleStatusChange(selectedRoute.id, "cancelled")}
           sx={{ color: "error.main" }}
         >
-          <DeleteIcon style={{ marginRight: 8 }} />
+          <Box sx={{ mr: 1, display: "flex" }}><WorkspaceIcon name="delete" /></Box>
           Cancel Route
         </MenuItem>
       </Menu>
