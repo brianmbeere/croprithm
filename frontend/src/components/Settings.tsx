@@ -41,8 +41,6 @@ const profileStore = {
 const shortcuts = {
   farmer: [
     { page: "inventory", icon: "inventory", label: "Inventory", description: "Update stock and manage produce listings." },
-    { page: "orders", icon: "calendar", label: "Orders & pickup windows", description: "Open Orders to manage when customers can collect." },
-    { page: "plan", icon: "route", label: "Route planning", description: "Plan deliveries and organize your stops." },
   ],
   restaurant: [
     { page: "market", icon: "market", label: "Source produce", description: "Find farms and browse produce." },
@@ -156,7 +154,7 @@ export default function Settings({ user, role, onPageChange, store = profileStor
             <Stack spacing={2}>
               <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
                 <Box>
-                  <Typography id="business-profile-heading" component="h2" variant="h6">Business profile</Typography>
+                  <Typography id="business-profile-heading" component="h2" variant="h6">{role === "farmer" ? "Farm profile" : "Business profile"}</Typography>
                   <Typography variant="body2" color="text.secondary">Your business name, location and contact details.</Typography>
                 </Box>
                 {profile && <Button variant="outlined" onClick={openEditor} aria-label="Edit business profile" sx={{ flexShrink: 0 }}>Edit</Button>}
@@ -245,6 +243,18 @@ export default function Settings({ user, role, onPageChange, store = profileStor
           )}
         </List>
       </Card>
+      {role === "farmer" && <Card variant="outlined" component="section" aria-labelledby="fulfillment-shortcuts-heading">
+        <CardContent>
+          <Typography id="fulfillment-shortcuts-heading" component="h2" variant="h6">Pickup & delivery</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ my: 1 }}>
+            Post pickup windows in Orders or organize confirmed deliveries in Route planning.
+          </Typography>
+          <Stack direction="row" flexWrap="wrap" gap={1}>
+            <Button onClick={() => onPageChange("orders")} sx={{ minHeight: 44 }}>Orders & pickup windows</Button>
+            <Button onClick={() => onPageChange("plan")} sx={{ minHeight: 44 }}>Route planning</Button>
+          </Stack>
+        </CardContent>
+      </Card>}
     </Box>
 
     <Dialog open={editing} onClose={closeEditor} fullWidth fullScreen={isMobile} maxWidth="sm" aria-labelledby="edit-business-heading">

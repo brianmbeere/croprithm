@@ -79,8 +79,8 @@ const Dashboard: FunctionalComponent = () => {
         </Box>
       </Stack>;
       case "inventory": return <ProduceInventoryManager />;
-      case "orders": return <FulfillmentOrders />;
-      case "plan": return <RoutePlanner />;
+      case "orders": return <FulfillmentOrders onPlanDeliveries={() => setPage("plan")} />;
+      case "plan": return <RoutePlanner onOpenOrders={role === "farmer" ? () => setPage("orders") : undefined} />;
       case "saved": return <SavedRoutes />;
       case "analytics": return role === "farmer" ? <ProduceAnalytics /> : <SourcingInsights />;
       case "settings": return user && role && <Settings key={user.uid} user={user} role={role} onPageChange={setPage} />;

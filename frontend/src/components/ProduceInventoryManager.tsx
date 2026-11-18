@@ -285,21 +285,24 @@ const ProduceInventoryManager = () => {
   const published = (item: ProduceInventory) => item.is_available && item.quantity_available > 0;
   const counts = [
     { id: "all", label: "All listings", items: inventory },
-    { id: "published", label: "Published and in stock", items: inventory.filter(published) },
-    { id: "committed", label: "With committed stock", items: inventory.filter(item => item.quantity_committed > 0) },
+    { id: "published", label: "In stock", items: inventory.filter(published) },
+    { id: "committed", label: "Stock committed", items: inventory.filter(item => item.quantity_committed > 0) },
     { id: "inactive", label: "Paused", items: inventory.filter(item => !item.is_available) },
     { id: "soldout", label: "Sold out", items: inventory.filter(item => item.is_available && item.quantity_available <= 0) },
   ];
-  const visible = (counts.find(group => group.id === status)?.items ?? inventory).filter(item =>
-    [item.produce_type, item.variety, item.location].some(value => value?.toLowerCase().includes(query.trim().toLowerCase())));
+  const searchTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const visible = (counts.find(group => group.id === status)?.items ?? inventory).filter(item => {
+    const searchable = [item.produce_type, item.variety, item.location].filter(Boolean).join(" ").toLowerCase();
+    return searchTerms.every(term => searchable.includes(term));
+  });
 
   return (
     <Box>
       <Stack spacing={2} mb={3}>
         <WorkspaceHeading title="Produce inventory" description="Manage the produce, prices, and available stock restaurants see in Menurithm."
-          actions={<Button variant="contained" startIcon={<WorkspaceIcon name="add" />} onClick={() => handleOpenDialog()}>Add listing</Button>} />
+          actions={<Button variant="contained" sx={{ minHeight: 44 }} startIcon={<WorkspaceIcon name="add" />} onClick={() => handleOpenDialog()}>Add listing</Button>} />
         {!!inventory.length && <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} alignItems={{ sm: "center" }}>
-          <TextField fullWidth size="small" label="Search listings" value={query} onChange={event => {
+          <TextField fullWidth size="small" label="Search listings" placeholder="Produce, variety, or location" value={query} onChange={event => {
             setQuery((event.target as HTMLInputElement).value);
           }} />
           <TextField select size="small" label="Listing status" value={status} sx={{ minWidth: { sm: 220 } }}
@@ -326,13 +329,13 @@ const ProduceInventoryManager = () => {
               {inventory.length ? "No listings match" : "No produce inventory yet"}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {inventory.length ? "Try another search or listing status." : "Add your first produce item to start selling."}
+              {inventory.length ? "Try another search or listing status." : "Add your first listing with a price, unit, and available quantity. Restaurants can shop published listings that have stock."}
             </Typography>
             <Button variant="outlined" onClick={() => {
               if (inventory.length) { setQuery(""); setStatus("all"); }
               else handleOpenDialog();
             }}>
-              {inventory.length ? "Clear filters" : "Add produce"}
+              {inventory.length ? "Clear filters" : "Add first listing"}
             </Button>
           </CardContent>
         </Card>

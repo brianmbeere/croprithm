@@ -36,7 +36,7 @@ import { fulfillmentWindowLabel } from "../utils/pickupWindows";
 import { useMeasurementPreferences } from "../context/MeasurementPreferences";
 import { distanceFromMiles, distanceUnit, weightEquivalent } from "../utils/measurements";
 
-const RoutePlanner: FunctionalComponent = () => {
+const RoutePlanner: FunctionalComponent<{ onOpenOrders?: () => void }> = ({ onOpenOrders }) => {
   const { system } = useMeasurementPreferences();
   const [pickup, setPickup] = useState("");
   const [stops, setStops] = useState<{ address: string }[]>([{ address: "" }]);
@@ -48,7 +48,7 @@ const RoutePlanner: FunctionalComponent = () => {
 
   // Accepted orders from backend
   const [acceptedOrders, setAcceptedOrders] = useState<BackendProduceRequest[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(true);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [removingOrderId, setRemovingOrderId] = useState<number | null>(null);
@@ -221,7 +221,7 @@ const RoutePlanner: FunctionalComponent = () => {
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
         <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={2}>
           <Typography variant="h6">
-            Approved delivery orders
+            Orders eligible for delivery planning
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <Button 
@@ -236,7 +236,7 @@ const RoutePlanner: FunctionalComponent = () => {
               variant="contained" 
               size="small" 
               onClick={applySelectedOrdersAsStops}
-              disabled={selectedOrderIds.size === 0}
+              disabled={loadingOrders || Boolean(ordersError) || selectedOrderIds.size === 0}
             >
               Use Selected as Stops ({selectedOrderIds.size})
             </Button>
@@ -251,9 +251,9 @@ const RoutePlanner: FunctionalComponent = () => {
           <Box display="flex" justifyContent="center" py={2}>
             <CircularProgress size={24} />
           </Box>
-        ) : acceptedOrders.length === 0 ? (
-          <Alert severity="info">
-            No approved delivery orders yet. Quote farmer delivery in Orders and wait for customer approval. Pickup orders do not appear here.
+        ) : ordersError ? null : acceptedOrders.length === 0 ? (
+          <Alert severity="info" action={onOpenOrders && <Button color="inherit" onClick={onOpenOrders}>Open orders</Button>}>
+            No confirmed delivery orders are available to add as stops. Delivery quotes appear here after the customer accepts them. Pickup orders stay in Orders. You can still preview a route with addresses below.
           </Alert>
         ) : (
           <Box sx={{ maxHeight: 200, overflowY: "auto" }}>
@@ -357,13 +357,14 @@ const RoutePlanner: FunctionalComponent = () => {
             </Button>
             <TextField fullWidth label="Route name" value={routeName}
               onChange={event => setRouteName(event.currentTarget.value)} sx={{ mt: 2 }} />
-            <Button fullWidth variant="outlined" disabled={loading || Boolean(savedRoute)}
+            <Button fullWidth variant="outlined"
+              disabled={loading || loadingOrders || Boolean(ordersError) || selectedOrderIds.size === 0 || Boolean(savedRoute)}
               onClick={saveSelectedRoute} sx={{ mt: 2, minHeight: 44 }}>
               Save selected orders for delivery
             </Button>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               Saving optimizes the selected accepted orders for today and stores progress online.
-              Manual-address previews below are not saved. Resume existing orders in Saved Routes instead of saving them twice.
+              Routes previewed from manual addresses are not saved. Resume existing orders in Saved Routes instead of saving them twice.
             </Typography>
           </Box>
           {result && (

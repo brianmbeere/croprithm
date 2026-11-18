@@ -14,6 +14,12 @@ close to the 720:570 aspect ratio to avoid excessive cropping.
 
 ## Farmer fulfillment pilot
 
+Use **Produce inventory → Add listing** to publish your first crop with a price,
+unit, and available quantity. In **Orders**, filter the queue by pickup or
+delivery, or use **Plan deliveries** to open the route planner. Pickup windows
+are managed separately under **Manage pickup windows**. Only eligible confirmed
+delivery orders can be added as order stops; pickup orders stay in the queue.
+
 The refreshed interface uses the logo's `#3A8374` green for primary actions
 and selection accents, with readable contrasting text and neutral surfaces.
 Farmers start on **Overview**, with shortcuts to **Inventory**, **Orders**,

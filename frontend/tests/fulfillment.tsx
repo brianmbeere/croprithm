@@ -119,8 +119,8 @@ const fixtureSettingsStore = {
 function WorkspaceFixture() {
   const [page, setPage] = useState<WorkspacePage>('overview');
   return <MeasurementPreferences uid={fixtureAccount.uid}><WorkspaceLayout role={role} page={page} onPageChange={setPage} onLogout={() => {}}>
-    {page === 'inventory' ? <ProduceInventoryManager /> : page === 'orders' ? <FulfillmentOrders />
-      : page === 'plan' ? <RoutePlanner />
+    {page === 'inventory' ? <ProduceInventoryManager /> : page === 'orders' ? <FulfillmentOrders onPlanDeliveries={() => setPage('plan')} />
+      : page === 'plan' ? <RoutePlanner onOpenOrders={role === 'farmer' ? () => setPage('orders') : undefined} />
       : page === 'settings' ? <Settings user={fixtureAccount} role={role} store={fixtureSettingsStore} onPageChange={setPage} />
       : page === 'market' ? <WorkspaceHeading title="Source produce" description="Restaurant workspace fixture." />
       : <WorkspaceHeading title="Workspace fixture" description="Test the workspace navigation." />}

@@ -65,7 +65,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return data;
 }
 
-export default function FulfillmentOrders() {
+export default function FulfillmentOrders({ onPlanDeliveries }: { onPlanDeliveries?: () => void } = {}) {
   const { system } = useMeasurementPreferences();
   const [orders, setOrders] = useState<Order[]>([]);
   const [inventory, setInventory] = useState<ProduceInventory[]>([]);
@@ -81,6 +81,7 @@ export default function FulfillmentOrders() {
   const [windowNotice, setWindowNotice] = useState('');
   const [activeView, setActiveView] = useState<OrderView>('open');
   const [query, setQuery] = useState('');
+  const [fulfillment, setFulfillment] = useState<'all' | Order['method']>('all');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const windowPath = 'marketplace/farmer/pickup-windows';
 
@@ -174,7 +175,8 @@ export default function FulfillmentOrders() {
   const visible = viewOrders
     .filter(order => {
       const searchable = `${order.restaurant_name} ${order.produce_type} ${orderReference(order)} request #${order.request_id}`.toLowerCase();
-      return query.trim().toLowerCase().split(/\s+/).every(term => searchable.includes(term));
+      return (fulfillment === 'all' || order.method === fulfillment)
+        && query.trim().toLowerCase().split(/\s+/).every(term => searchable.includes(term));
     });
   if (activeView === 'open') visible.sort((a, b) => Date.parse(a.window_start) - Date.parse(b.window_start) || a.id - b.id);
   const selectedOrder = orders.find(order => order.id === selectedId);
@@ -210,9 +212,13 @@ export default function FulfillmentOrders() {
     <Stack spacing={3}>
       <WorkspaceHeading title="Orders"
         description="See what to pack, who it’s for, and when it needs to be ready."
-        actions={<Button variant="contained" startIcon={<WorkspaceIcon name="calendar" />} disabled={busy}
-          aria-expanded={showWindows} aria-controls={showWindows ? "pickup-window-panel" : undefined}
-          onClick={() => showWindows ? setShowWindows(false) : void manageWindows('load')}>Manage pickup windows</Button>} />
+        actions={<Stack direction="row" gap={1} flexWrap="wrap">
+          {onPlanDeliveries && <Button variant="contained" startIcon={<WorkspaceIcon name="route" />} sx={{ minHeight: 44 }}
+            onClick={onPlanDeliveries}>Plan deliveries</Button>}
+          <Button variant="outlined" startIcon={<WorkspaceIcon name="calendar" />} disabled={busy} sx={{ minHeight: 44 }}
+            aria-expanded={showWindows} aria-controls={showWindows ? "pickup-window-panel" : undefined}
+            onClick={() => showWindows ? setShowWindows(false) : void manageWindows('load')}>Manage pickup windows</Button>
+        </Stack>} />
       {!selectedOrder && error && <Alert severity="error" role="alert">{error}</Alert>}
       {!selectedOrder && notice && <Alert severity="success" role="status">{notice}</Alert>}
       {showWindows && <Card id="pickup-window-panel" variant="outlined"><CardContent><Stack spacing={2}>
@@ -270,6 +276,15 @@ export default function FulfillmentOrders() {
       <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} justifyContent="space-between">
         <TextField fullWidth size="small" label="Search orders" placeholder="Restaurant, produce, or order number"
           value={query} onChange={event => setQuery((event.target as HTMLInputElement).value)} />
+        <TextField select size="small" label="Fulfillment" value={fulfillment} sx={{ minWidth: { sm: 160 } }}
+          onChange={event => {
+            const value = (event.target as HTMLInputElement).value;
+            if (value === 'all' || value === 'customer_pickup' || value === 'farmer_delivery') setFulfillment(value);
+          }}>
+          <MenuItem value="all">All methods</MenuItem>
+          <MenuItem value="customer_pickup">Customer pickup</MenuItem>
+          <MenuItem value="farmer_delivery">Farmer delivery</MenuItem>
+        </TextField>
         <Button variant="outlined" startIcon={<WorkspaceIcon name="refresh" />} disabled={loading || busy} onClick={refresh}
           sx={{ flexShrink: 0 }}>Refresh orders</Button>
       </Stack>
@@ -278,9 +293,9 @@ export default function FulfillmentOrders() {
       </Typography>}
       {loading && !orders.length ? <CircularProgress aria-label="Loading orders" /> : visible.length === 0 && !error ?
         <Card variant="outlined"><CardContent>
-          <Typography variant="h6">{query.trim() ? 'No orders match' : view.empty}</Typography>
-          <Typography color="text.secondary">{query.trim() ? 'Try another restaurant, produce name, or order number.' : view.description}</Typography>
-          {query.trim() && <Button onClick={() => setQuery('')}>Clear search</Button>}
+          <Typography variant="h6">{viewOrders.length ? 'No orders match' : view.empty}</Typography>
+          <Typography color="text.secondary">{viewOrders.length ? 'Try a different search or fulfillment method.' : view.description}</Typography>
+          {(query.trim() || fulfillment !== 'all') && <Button onClick={() => { setQuery(''); setFulfillment('all'); }}>Clear filters</Button>}
         </CardContent></Card> : null}
       {visible.length > 0 && <Card variant="outlined">
         <Box component="ul" aria-label="Order items" sx={{ listStyle: 'none', m: 0, p: 0 }}>
@@ -300,7 +315,7 @@ export default function FulfillmentOrders() {
             <Stack direction={{ xs: 'row', md: 'column', lg: 'row' }} gap={1} alignItems="center"
               justifyContent={{ xs: 'space-between', md: 'flex-end' }} flexWrap="wrap">
               <Chip size="small" label={stageLabel(order)} color={order.stage === 'accepted' || order.stage === 'ready' ? 'success' : 'default'} />
-              <Button variant="outlined" size="small" aria-haspopup="dialog"
+              <Button variant="outlined" size="small" aria-haspopup="dialog" sx={{ minHeight: 44 }}
                 aria-label={`${nextAction(order)}: ${itemLabel(order)}, ${orderReference(order)}`}
                 onClick={() => openDetails(order)}>{nextAction(order)}</Button>
             </Stack>
