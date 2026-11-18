@@ -52,6 +52,11 @@ upcoming `pickup_windows` for the farm. Checkout responses include `state`,
 `produce_subtotal`, and `payment_method: "pay_at_pickup"`. No Stripe calls are
 made. Agreement responses include `pickup_checkout_id` for grouped orders.
 
+`GET /api/produce/illustrations` lists the supported crop illustrations.
+Inventory create and update accept an optional `illustration_id`; `null`
+uses automatic matching. Marketplace listings include the selected
+`illustration` (or `null`) and `harvest_date` when supplied.
+
 Farmer `GET /api/produce/inventory` returns `quantity_available` (uncommitted
 stock) and `quantity_committed`; their sum represents on-hand stock. A
 `PUT /api/produce/inventory/{id}` that sets `quantity_available` must include

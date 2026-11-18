@@ -14,6 +14,7 @@ from app.db.database import get_db
 from app.models.user import User
 from app.models.produce import ProduceInventory, ProduceRequest
 from app.models.fulfillment import FulfillmentAgreement, PickupCheckout, PickupWindow
+from app.schemas.produce_illustrations import ILLUSTRATIONS
 from app.utils.auth_dependency import verify_firebase_token
 from app.services.fulfillment import advance_handover, cancel_agreement, matching_listing, reserve_stock
 
@@ -409,6 +410,8 @@ def available_produce_for_menurithm(
             "location": listing.location,
             "organic": listing.organic,
             "description": listing.description,
+            "illustration": ILLUSTRATIONS.get(listing.illustration_id),
+            "harvest_date": listing.harvest_date,
             "expiry_date": listing.expiry_date,
         }
         for listing in listings
@@ -510,6 +513,8 @@ def available_produce_for_menurithm(
             "location": listing.location,
             "organic": listing.organic,
             "description": listing.description,
+            "illustration": ILLUSTRATIONS.get(listing.illustration_id),
+            "harvest_date": listing.harvest_date,
             "expiry_date": listing.expiry_date,
         }
         for listing in listings

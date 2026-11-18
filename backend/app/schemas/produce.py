@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 from datetime import datetime
+from app.schemas.produce_illustrations import IllustrationId
 
 # Produce Inventory Schemas
 class ProduceInventoryCreate(BaseModel):
+    illustration_id: Optional[IllustrationId] = None
     produce_type: str
     variety: Optional[str] = None
     quantity_available: float = Field(ge=0, allow_inf_nan=False)
@@ -18,6 +20,7 @@ class ProduceInventoryCreate(BaseModel):
     description: Optional[str] = None
 
 class ProduceInventoryUpdate(BaseModel):
+    illustration_id: Optional[IllustrationId] = None
     produce_type: Optional[str] = None
     variety: Optional[str] = None
     quantity_available: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
@@ -34,6 +37,7 @@ class ProduceInventoryUpdate(BaseModel):
     is_available: Optional[bool] = None
 
 class ProduceInventoryResponse(BaseModel):
+    illustration_id: Optional[IllustrationId] = None
     id: int
     seller_id: int
     produce_type: str

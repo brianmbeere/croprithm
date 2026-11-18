@@ -47,6 +47,9 @@ Ordinary route progress and legacy **Mark delivered** do not confirm an order.
 The **Farm storefront** shows listing status and committed stock. Menurithm's
 checkout preview reads published stock and posted prices from Croprithm and
 reviews one farm's cart at a time. It does not create orders or reserve stock.
+When creating or editing a listing, choose a **Crop illustration** for
+Menurithm shoppers or keep **Automatic match**. Existing listings continue to
+use automatic matching until changed.
 
 In **Orders & handovers**, choose **Manage pickup windows** to publish a
 future pickup window for in-stock listings. A window is a pickup time range,

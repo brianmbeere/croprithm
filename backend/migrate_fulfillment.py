@@ -12,6 +12,9 @@ if __name__ == "__main__":
     FulfillmentAgreement.__table__.create(engine, checkfirst=True)
     columns = {column["name"] for column in inspect(engine).get_columns("fulfillment_agreements")}
     with engine.begin() as connection:
+        inventory_columns = {column["name"] for column in inspect(connection).get_columns("produce_inventory")}
+        if "illustration_id" not in inventory_columns:
+            connection.execute(text("ALTER TABLE produce_inventory ADD COLUMN illustration_id VARCHAR(32)"))
         if "produce_inventory_id" not in columns:
             connection.execute(text(
                 "ALTER TABLE fulfillment_agreements ADD COLUMN produce_inventory_id "

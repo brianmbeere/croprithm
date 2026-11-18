@@ -3,6 +3,13 @@ import { auth } from "../hooks/initializeFirebase";
 import { BASE_URL as API_BASE_URL } from "../utils";
 
 // Types matching backend schemas
+export interface ProduceIllustration {
+  id: string;
+  label: string;
+  symbol: string;
+  background: string;
+}
+
 export interface ProduceInventory {
   id: number;
   seller_id: number;
@@ -19,6 +26,7 @@ export interface ProduceInventory {
   longitude?: number;
   organic: boolean;
   description?: string;
+  illustration_id?: string | null;
   is_available: boolean;
   created_at: string;
   updated_at: string;
@@ -125,6 +133,12 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
 // Produce Inventory API
 export const produceInventoryApi = {
+  async getIllustrations(): Promise<ProduceIllustration[]> {
+    const response = await fetch(`${API_BASE_URL}/api/produce/illustrations`);
+    if (!response.ok) throw new Error('Could not load crop illustrations.');
+    return response.json();
+  },
+
   async create(inventory: Omit<ProduceInventory, 'id' | 'seller_id' | 'created_at' | 'updated_at' | 'is_available' | 'quantity_committed'>): Promise<ProduceInventory> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/produce/inventory`, {

@@ -80,6 +80,34 @@ class FulfillmentTests(unittest.TestCase):
     def stage(self, order, stage):
         return self.client.put(f"/api/fulfillment/farmer/orders/{order['id']}/stage", json={"stage": stage})
 
+    def test_listing_illustration_can_be_selected_changed_and_cleared(self):
+        catalog = self.client.get("/api/produce/illustrations")
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        options = {option["id"]: option for option in catalog.json()}
+        response = self.client.post("/api/produce/inventory", json={
+            "produce_type": "Salad mix", "quantity_available": 5, "unit": "kg",
+            "price_per_unit": 4, "location": "Farm", "illustration_id": "greens",
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        item = response.json()
+        self.assertEqual(item["illustration_id"], "greens")
+        endpoint = f"/api/produce/inventory/{item['id']}"
+
+        def listing():
+            return next(row for row in self.client.get("/api/fulfillment/produce/available").json()
+                        if row["id"] == item["id"])
+
+        self.assertEqual(listing()["illustration"], options["greens"])
+        self.uid = "other"
+        self.assertEqual(self.client.put(endpoint, json={"illustration_id": "seedling"}).status_code, 404)
+        self.uid = "farmer"
+        self.assertEqual(self.client.put(endpoint, json={"illustration_id": "unknown"}).status_code, 422)
+        self.assertEqual(self.client.put(endpoint, json={"illustration_id": "seedling"}).status_code, 200)
+        self.assertEqual(listing()["illustration"], options["seedling"])
+        self.assertEqual(self.client.put(endpoint, json={"illustration_id": None}).status_code, 200)
+        self.assertIsNone(listing()["illustration"])
+        self.assertEqual(listing()["quantity_available"], 5)
+
     def test_pay_at_pickup_places_once_and_handover_does_not_deduct_twice(self):
         windows = "/api/fulfillment/marketplace/farmer/pickup-windows"
         checkouts = "/api/fulfillment/marketplace/pickup-checkouts"

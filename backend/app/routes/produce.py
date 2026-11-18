@@ -12,9 +12,15 @@ from app.schemas.produce import (
     ProduceInventoryResponse
 )
 from app.utils.auth_dependency import verify_firebase_token
+from app.schemas.produce_illustrations import ILLUSTRATIONS, ProduceIllustration
 from app.services.menurithm_api import menurithm_client
 
 router = APIRouter(prefix="/api/produce", tags=["produce"])
+
+
+@router.get("/illustrations", response_model=list[ProduceIllustration])
+def list_produce_illustrations():
+    return list(ILLUSTRATIONS.values())
 
 
 def inventory_with_commitments(db: Session):

@@ -23,7 +23,7 @@ import {
   Stack
 } from "@mui/material";
 import { AddIcon, EditIcon, DeleteIcon, MoreVertIcon } from "../components/SVGIcons";
-import { produceInventoryApi, type ProduceInventory } from "../api/produceApi";
+import { produceInventoryApi, type ProduceIllustration, type ProduceInventory } from "../api/produceApi";
 
 const ProduceInventoryManager = () => {
   const [inventory, setInventory] = useState<ProduceInventory[]>([]);
@@ -44,9 +44,13 @@ const ProduceInventoryManager = () => {
     longitude: 0,
     organic: false,
     description: '',
+    illustration_id: '',
     is_available: true
   });
   const [submitting, setSubmitting] = useState(false);
+  const [illustrations, setIllustrations] = useState<ProduceIllustration[]>([]);
+  const [illustrationError, setIllustrationError] = useState('');
+  const [loadingIllustrations, setLoadingIllustrations] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [selectedItem, setSelectedItem] = useState<ProduceInventory | null>(null);
 
@@ -84,6 +88,7 @@ const ProduceInventoryManager = () => {
         longitude: item.longitude || 0,
         organic: item.organic,
         description: item.description || '',
+        illustration_id: item.illustration_id ?? '',
         is_available: item.is_available
       });
     } else {
@@ -101,10 +106,19 @@ const ProduceInventoryManager = () => {
         longitude: 0,
         organic: false,
         description: '',
+        illustration_id: '',
         is_available: true
       });
     }
     setDialogOpen(true);
+    if (!illustrations.length && !loadingIllustrations) {
+      setLoadingIllustrations(true);
+      setIllustrationError('');
+      void produceInventoryApi.getIllustrations()
+        .then(setIllustrations)
+        .catch(err => setIllustrationError(err instanceof Error ? err.message : 'Could not load crop illustrations.'))
+        .finally(() => setLoadingIllustrations(false));
+    }
   };
 
   const handleCloseDialog = () => {
@@ -128,7 +142,8 @@ const ProduceInventoryManager = () => {
         latitude: formData.latitude || undefined,
         longitude: formData.longitude || undefined,
         organic: formData.organic,
-        description: formData.description || undefined
+        description: formData.description || undefined,
+        illustration_id: formData.illustration_id || null,
       };
 
       if (editingItem) {
@@ -386,6 +401,27 @@ const ProduceInventoryManager = () => {
                 value={formData.variety}
                 onChange={(e) => setFormData({ ...formData, variety: (e.target as HTMLInputElement).value })}
               />
+            </Grid>
+            <Grid size={12}>
+              <TextField fullWidth select label="Crop illustration" value={formData.illustration_id}
+                slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}
+                disabled={loadingIllustrations || Boolean(illustrationError)}
+                helperText={loadingIllustrations ? 'Loading illustrations...' : illustrationError
+                  ? `${illustrationError} Reopen the form to retry.`
+                  : 'Choose the artwork shoppers will see, or match the produce type automatically.'}
+                onChange={event => {
+                  const illustration_id = (event.target as HTMLInputElement).value;
+                  setFormData(previous => ({ ...previous, illustration_id }));
+                }}>
+                <MenuItem value="">Automatic match</MenuItem>
+                {formData.illustration_id && !illustrations.some(option => option.id === formData.illustration_id) &&
+                  <MenuItem value={formData.illustration_id}>Current illustration</MenuItem>}
+                {illustrations.map(option => <MenuItem key={option.id} value={option.id}>
+                  <Box component="span" aria-hidden="true" sx={{ display: 'inline-grid', placeItems: 'center', width: 36,
+                    height: 32, mr: 1, borderRadius: 1, bgcolor: option.background }}>{option.symbol}</Box>
+                  {option.label}
+                </MenuItem>)}
+              </TextField>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
