@@ -18,6 +18,7 @@ import ProduceInventoryManager from "../components/ProduceInventoryManager";
 import FarmFinder from "../components/FarmFinder";
 import Settings from "../components/Settings";
 import FulfillmentOrders from "../components/FulfillmentOrders";
+import { MeasurementPreferences } from "../context/MeasurementPreferences";
 
 const Dashboard: FunctionalComponent = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -93,12 +94,12 @@ const Dashboard: FunctionalComponent = () => {
   if (!role) return <Box p={3}><Alert severity="warning">Your account needs a farmer or restaurant role. Please contact support.</Alert></Box>;
 
   return (
-    <>
+    <MeasurementPreferences key={user.uid} uid={user.uid}>
       <CssBaseline />
       <WorkspaceLayout role={role} page={page} onPageChange={setPage} onLogout={() => void handleLogout()}>
         {getTabContent()}
       </WorkspaceLayout>
-    </>
+    </MeasurementPreferences>
   );
 };
 

@@ -24,12 +24,15 @@ import {
 } from "@mui/material";
 import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
 import { produceInventoryApi, type ProduceIllustration, type ProduceInventory } from "../api/produceApi";
+import { useMeasurementPreferences } from "../context/MeasurementPreferences";
+import { defaultWeightUnit, weightEquivalent } from "../utils/measurements";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const totalStock = (item: ProduceInventory) => Number((item.quantity_available + (item.quantity_committed ?? 0)).toPrecision(12));
 const stockColumns = "minmax(160px, 2fr) repeat(3, minmax(75px, 1fr)) minmax(108px, 1fr) minmax(148px, auto)";
 
 const ProduceInventoryManager = () => {
+  const { system } = useMeasurementPreferences();
   const [inventory, setInventory] = useState<ProduceInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -41,7 +44,7 @@ const ProduceInventoryManager = () => {
     produce_type: '',
     variety: '',
     quantity_available: 0,
-    unit: 'kg',
+    unit: defaultWeightUnit(system),
     price_per_unit: 0,
     harvest_date: '',
     expiry_date: '',
@@ -121,7 +124,7 @@ const ProduceInventoryManager = () => {
         produce_type: '',
         variety: '',
         quantity_available: 0,
-        unit: 'kg',
+        unit: defaultWeightUnit(system),
         price_per_unit: 0,
         harvest_date: '',
         expiry_date: '',
@@ -365,15 +368,19 @@ const ProduceInventoryManager = () => {
                   ["Available", item.quantity_available],
                   ["Committed", item.quantity_committed ?? 0],
                   ["On hand", totalStock(item)],
-                ] as const).map(([label, quantity]) => <Box key={label}>
-                  <Typography variant="caption" color="text.secondary" sx={{
-                    overflowWrap: "anywhere",
-                    display: { xs: "block", lg: "inline" },
-                    position: { lg: "absolute" }, clipPath: { lg: "inset(50%)" },
-                  }}>{label}: </Typography>
-                  <Typography variant="body2" fontWeight={label === "Available" ? 750 : 500}
-                    sx={{ overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums" }}>{quantity} {item.unit}</Typography>
-                </Box>)}
+                ] as const).map(([label, quantity]) => {
+                  const equivalent = weightEquivalent(quantity, item.unit, system);
+                  return <Box key={label}>
+                    <Typography variant="caption" color="text.secondary" sx={{
+                      overflowWrap: "anywhere",
+                      display: { xs: "block", lg: "inline" },
+                      position: { lg: "absolute" }, clipPath: { lg: "inset(50%)" },
+                    }}>{label}: </Typography>
+                    <Typography variant="body2" fontWeight={label === "Available" ? 750 : 500}
+                      sx={{ overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums" }}>{quantity} {item.unit}</Typography>
+                    {equivalent && <Typography variant="caption" color="text.secondary" display="block">{equivalent}</Typography>}
+                  </Box>;
+                })}
                 <Box sx={{ gridColumn: { xs: "1", lg: "auto" } }}>
                   <Chip label={!item.is_available ? "Paused" : published(item) ? "Published" : "Sold out"}
                     color={published(item) ? "primary" : "default"} size="small" />

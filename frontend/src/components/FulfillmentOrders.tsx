@@ -8,6 +8,8 @@ import { auth } from '../hooks/initializeFirebase';
 import { BASE_URL } from '../utils';
 import { produceInventoryApi, type ProduceInventory } from '../api/produceApi';
 import { WorkspaceHeading, WorkspaceIcon } from './WorkspaceUI';
+import { useMeasurementPreferences } from '../context/MeasurementPreferences';
+import { weightEquivalent } from '../utils/measurements';
 import { fulfillmentWindowLabel as windowLabel, pickupWindowEnd, pickupWindowTimes } from '../utils/pickupWindows';
 
 interface Order {
@@ -64,6 +66,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export default function FulfillmentOrders() {
+  const { system } = useMeasurementPreferences();
   const [orders, setOrders] = useState<Order[]>([]);
   const [inventory, setInventory] = useState<ProduceInventory[]>([]);
   const [drafts, setDrafts] = useState<Record<number, Quote>>({});
@@ -287,6 +290,7 @@ export default function FulfillmentOrders() {
           }}>
             <Box>
               <Typography component="h2" fontWeight={750}>{itemLabel(order)}</Typography>
+              <Typography variant="caption" color="text.secondary">{weightEquivalent(order.quantity_needed, order.unit, system)}</Typography>
               <Typography variant="body2" color="text.secondary">{order.restaurant_name} · {orderReference(order)}</Typography>
             </Box>
             <Box>
@@ -313,7 +317,12 @@ export default function FulfillmentOrders() {
           && item.produce_type.trim().toLowerCase() === order.produce_type.trim().toLowerCase()
           && item.unit.trim().toLowerCase() === order.unit.trim().toLowerCase());
         return <Dialog key={order.id} open onClose={closeDetails} fullWidth maxWidth="md" scroll="paper" aria-labelledby="order-details-title">
-          <DialogTitle id="order-details-title">{itemLabel(order)}</DialogTitle>
+          <DialogTitle id="order-details-title">
+            {itemLabel(order)}
+            <Typography component="span" display="block" variant="body2" color="text.secondary">
+              {weightEquivalent(order.quantity_needed, order.unit, system)}
+            </Typography>
+          </DialogTitle>
           <DialogContent dividers>
           <Stack spacing={2}>
             {error && <Alert severity="error" role="alert">{error}</Alert>}

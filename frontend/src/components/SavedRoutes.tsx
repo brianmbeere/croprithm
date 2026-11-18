@@ -22,6 +22,8 @@ import {
   Grid,
 } from "@mui/material";
 import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
+import { useMeasurementPreferences } from "../context/MeasurementPreferences";
+import { distanceFromMiles, distanceUnit, fuelFromGallons, fuelUnit, weightFromKg, defaultWeightUnit } from "../utils/measurements";
 import { deliveryRouteApi, type DeliveryRoute } from "../api/produceApi";
 import DeliveryItinerary from "./route/DeliveryItinerary";
 import NavigationButtons from "./route/NavigationButtons";
@@ -36,6 +38,9 @@ interface RouteMetrics {
 }
 
 const SavedRoutes = () => {
+  const { system } = useMeasurementPreferences();
+  const routeDistance = (miles: number | null | undefined, precision: number) =>
+    miles == null ? "—" : `${distanceFromMiles(miles, system).toFixed(precision)} ${distanceUnit(system)}`;
   const [routes, setRoutes] = useState<DeliveryRoute[]>([]);
   const [allRoutes, setAllRoutes] = useState<DeliveryRoute[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,10 +250,10 @@ const SavedRoutes = () => {
           <Grid size={{ xs: 6, md: 2 }}>
             <Box textAlign="center">
               <Typography variant="h4" color="info.main">
-                {metrics.totalMilesSaved.toFixed(1)}
+                {distanceFromMiles(metrics.totalMilesSaved, system).toFixed(1)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Miles Saved
+                {system === "metric" ? "Kilometers" : "Miles"} Saved
               </Typography>
             </Box>
           </Grid>
@@ -265,20 +270,20 @@ const SavedRoutes = () => {
           <Grid size={{ xs: 6, md: 2 }}>
             <Box textAlign="center">
               <Typography variant="h4" color="success.dark">
-                {metrics.co2Saved.toFixed(1)}
+                {weightFromKg(metrics.co2Saved, system).toFixed(1)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                kg CO₂ Saved
+                {defaultWeightUnit(system)} CO₂ Saved
               </Typography>
             </Box>
           </Grid>
           <Grid size={{ xs: 6, md: 2 }}>
             <Box textAlign="center">
               <Typography variant="h4" color="secondary.main">
-                {metrics.fuelSaved.toFixed(1)}
+                {fuelFromGallons(metrics.fuelSaved, system).toFixed(1)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Gallons Saved
+                {system === "metric" ? "Liters" : "U.S. Gallons"} Saved
               </Typography>
             </Box>
           </Grid>
@@ -371,7 +376,7 @@ const SavedRoutes = () => {
                         Distance
                       </Typography>
                       <Typography variant="body2" fontWeight="bold">
-                        {route.total_distance_miles?.toFixed(1) || "—"} mi
+                        {routeDistance(route.total_distance_miles, 1)}
                       </Typography>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
@@ -499,7 +504,7 @@ const SavedRoutes = () => {
                     Total Distance
                   </Typography>
                   <Typography variant="h6">
-                    {selectedRoute.total_distance_miles?.toFixed(2) || "—"} miles
+                    {routeDistance(selectedRoute.total_distance_miles, 2)}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6 }}>
@@ -534,10 +539,10 @@ const SavedRoutes = () => {
                     Environmental Impact Estimate
                   </Typography>
                   <Typography variant="body2">
-                    🌱 CO₂ Saved: {(selectedRoute.total_distance_miles * 0.15 * 0.404).toFixed(2)} kg
+                    🌱 CO₂ Saved: {weightFromKg(selectedRoute.total_distance_miles * 0.15 * 0.404, system).toFixed(2)} {defaultWeightUnit(system)}
                   </Typography>
                   <Typography variant="body2">
-                    ⛽ Fuel Saved: {(selectedRoute.total_distance_miles * 0.15 / 25).toFixed(2)} gallons
+                    ⛽ Fuel Saved: {fuelFromGallons(selectedRoute.total_distance_miles * 0.15 / 25, system).toFixed(2)} {fuelUnit(system)}
                   </Typography>
                 </Paper>
               )}

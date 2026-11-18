@@ -60,6 +60,12 @@ The old **Legacy requests** page has been retired. Historical records are
 retained, but legacy requests can no longer be managed through that page.
 Use **Settings** to update your business profile, review sign-in details, or
 jump to the workspace tools available to your account.
+**Settings → Measurements** defaults to U.S. customary (lb, mi) and also
+supports metric (kg, km). The preference is saved per account in the current
+browser. It changes route displays, the starting unit on new listings, and
+approximate weight equivalents shown beside original inventory and order
+quantities. Stored quantities, listing prices, checkout, and report exports
+keep their original units. Count and package units are not converted.
 Existing orders are not retroactively reserved or priced. A pre-existing
 accepted order linked to a listing still deducts at handover if not already
 reserved. Historical unlinked handovers do not affect stock. Completed

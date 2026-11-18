@@ -33,8 +33,11 @@ import { WorkspaceHeading, WorkspaceIcon } from '../components/WorkspaceUI';
 import NavigationButtons from "../components/route/NavigationButtons";
 import DeliveryItinerary from "../components/route/DeliveryItinerary";
 import { fulfillmentWindowLabel } from "../utils/pickupWindows";
+import { useMeasurementPreferences } from "../context/MeasurementPreferences";
+import { distanceFromMiles, distanceUnit, weightEquivalent } from "../utils/measurements";
 
 const RoutePlanner: FunctionalComponent = () => {
+  const { system } = useMeasurementPreferences();
   const [pickup, setPickup] = useState("");
   const [stops, setStops] = useState<{ address: string }[]>([{ address: "" }]);
   const [loading, setLoading] = useState(false);
@@ -288,7 +291,7 @@ const RoutePlanner: FunctionalComponent = () => {
                       variant="outlined" 
                     />
                     <Chip 
-                      label={`${order.quantity_needed} ${order.unit}`} 
+                      label={[`${order.quantity_needed} ${order.unit}`, weightEquivalent(order.quantity_needed, order.unit, system)].filter(Boolean).join(" · ")}
                       size="small" 
                       variant="outlined" 
                     />
@@ -370,7 +373,7 @@ const RoutePlanner: FunctionalComponent = () => {
               </Typography>
               <MapboxRouteMap stops={result.stops} />
               <Typography sx={{ mb: 2 }}>
-                Estimated {result.total_distance_miles.toFixed(1)} miles · {result.total_eta} minutes
+                Estimated {distanceFromMiles(result.total_distance_miles, system).toFixed(1)} {distanceUnit(system)} · {result.total_eta} minutes
               </Typography>
               <Alert severity="warning" sx={{ mb: 2 }}>Preview only. Save accepted orders above to retain delivery progress.</Alert>
               <Typography component="h3" variant="subtitle1" fontWeight={700}>Stop order</Typography>

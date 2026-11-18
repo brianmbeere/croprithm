@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button, Card,
   CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, List, ListItemButton, ListItemIcon, ListItemText, Stack, TextField, Typography,
+  Divider, List, ListItemButton, ListItemIcon, ListItemText, MenuItem, Stack, TextField, Typography,
   useMediaQuery, useTheme,
 } from "@mui/material";
 import type { User } from "firebase/auth";
@@ -10,6 +10,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../hooks/initializeFirebase";
 import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
 import type { WorkspacePage, WorkspaceRole } from "./workspaceSections";
+import { useMeasurementPreferences } from "../context/MeasurementPreferences";
 
 type BusinessProfile = {
   organization: string;
@@ -75,6 +76,7 @@ export default function Settings({ user, role, onPageChange, store = profileStor
   const [saved, setSaved] = useState(false);
   const isMobile = useMediaQuery(useTheme().breakpoints.down("sm"));
   const { uid } = user;
+  const { system, setSystem, storageError } = useMeasurementPreferences();
 
   useEffect(() => {
     let active = true;
@@ -167,6 +169,30 @@ export default function Settings({ user, role, onPageChange, store = profileStor
                 : profile ? <Box component="dl" sx={{ m: 0, display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" } }}>
                   {fields.map(({ key, label }) => <Detail key={key} label={label} value={profile[key]} />)}
                 </Box> : <CircularProgress size={24} aria-label="Loading business profile" />}
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Card variant="outlined" component="section" aria-labelledby="measurement-heading">
+          <CardContent>
+            <Stack spacing={2}>
+              <Box>
+                <Typography id="measurement-heading" component="h2" variant="h6">Measurements</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Set route units and the default weight unit for new listings. Existing listings and orders keep their original units, with approximate weight equivalents where available.
+                </Typography>
+              </Box>
+              <TextField select label="Measurement system" value={system} size="small"
+                helperText="Saved for this account in this browser."
+                onChange={event => {
+                  const target = event.target;
+                  const value = target && "value" in target ? target.value : undefined;
+                  if (value === "us" || value === "metric") setSystem?.(value);
+                }}>
+                <MenuItem value="us">U.S. customary (lb, mi)</MenuItem>
+                <MenuItem value="metric">Metric (kg, km)</MenuItem>
+              </TextField>
+              {storageError && <Alert severity="warning">Browser storage isn’t available. Your selection may reset when you reload.</Alert>}
             </Stack>
           </CardContent>
         </Card>

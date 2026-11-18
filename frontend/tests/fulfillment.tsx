@@ -7,6 +7,7 @@ import FulfillmentOrders from '../src/components/FulfillmentOrders';
 import ProduceInventoryManager from '../src/components/ProduceInventoryManager';
 import WorkspaceLayout from '../src/components/WorkspaceLayout';
 import Settings from '../src/components/Settings';
+import { MeasurementPreferences } from '../src/context/MeasurementPreferences';
 import { WorkspaceHeading } from '../src/components/WorkspaceUI';
 import type { WorkspacePage } from '../src/components/workspaceSections';
 import RoutePlanner from '../src/pages/RoutePlanner';
@@ -117,13 +118,13 @@ const fixtureSettingsStore = {
 
 function WorkspaceFixture() {
   const [page, setPage] = useState<WorkspacePage>('overview');
-  return <WorkspaceLayout role={role} page={page} onPageChange={setPage} onLogout={() => {}}>
+  return <MeasurementPreferences uid={fixtureAccount.uid}><WorkspaceLayout role={role} page={page} onPageChange={setPage} onLogout={() => {}}>
     {page === 'inventory' ? <ProduceInventoryManager /> : page === 'orders' ? <FulfillmentOrders />
       : page === 'plan' ? <RoutePlanner />
       : page === 'settings' ? <Settings user={fixtureAccount} role={role} store={fixtureSettingsStore} onPageChange={setPage} />
       : page === 'market' ? <WorkspaceHeading title="Source produce" description="Restaurant workspace fixture." />
       : <WorkspaceHeading title="Workspace fixture" description="Test the workspace navigation." />}
-  </WorkspaceLayout>;
+  </WorkspaceLayout></MeasurementPreferences>;
 }
 const root = document.getElementById('fixture');
 if (!root) throw new Error('Missing fixture root');
