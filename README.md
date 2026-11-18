@@ -16,16 +16,24 @@ close to the 720:570 aspect ratio to avoid excessive cropping.
 
 The refreshed interface uses the logo's `#3A8374` green for primary actions
 and selection accents, with readable contrasting text and neutral surfaces.
-Farmers start on **Overview**, with shortcuts to **Inventory**, **Orders &
-handovers**, and route planning. The sidebar groups work under **Farm**,
-**Delivery**, and **Manage**. Inventory supports searching and filtering
-listings, with available, committed, and on-hand quantities shown separately.
-Orders can be filtered by status; manage pickup windows from the orders header.
+Farmers start on **Overview**, with shortcuts to **Inventory**, **Orders**,
+and route planning. The sidebar groups work under **Farm**,
+**Delivery**, and **Manage**. Inventory uses a compact list with search and
+status filters. Select a produce name for listing details, or choose **Update
+stock** to change the available count without including committed quantities.
+The inventory list shows available, committed, and on-hand quantities
+separately. If the count changed since the editor opened, reload the current
+stock in the editor before entering a new count.
+**Orders** opens on confirmed items awaiting preparation or handover, sorted
+by the start of their fulfillment window. Use **Quotes** for requests and
+negotiated prices or **History** for completed and canceled items. Record
+outstanding direct payments from History after handover. Manage pickup windows
+from the orders header.
 
 New orders use **customer pickup** or **farmer delivery**, not third-party
 dispatch. Customers create requests in Menurithm's **Produce orders** workspace
 (also accessible from inventory and service integrations). Farmers quote them
-in Croprithm's **Orders & handovers**. Farmers choose the method they can offer,
+in Croprithm's **Orders** under **Quotes**. Farmers choose the method they can offer,
 provide handover instructions, a USD produce subtotal and a delivery fee. Pickup requires a pickup
 address and a zero delivery fee. Delivery requires the customer's address.
 The customer's requested timezone-aware window is retained in the agreement.
@@ -48,7 +56,10 @@ Customers refresh their orders to see updates, with no unreliable callback
 dependency between the apps. Farmer confirmation is not customer proof of receipt.
 
 New pickup orders and unapproved delivery quotes cannot enter delivery routes.
-Historical requests remain in **Legacy requests** with their original behavior.
+The old **Legacy requests** page has been retired. Historical records are
+retained, but legacy requests can no longer be managed through that page.
+Use **Settings** to update your business profile, review sign-in details, or
+jump to the workspace tools available to your account.
 Existing orders are not retroactively reserved or priced. A pre-existing
 accepted order linked to a listing still deducts at handover if not already
 reserved. Historical unlinked handovers do not affect stock. Completed
@@ -56,7 +67,7 @@ historical orders are not reconciled automatically.
 From a saved itinerary in **Route Planner** or **Saved Routes > View Details**,
 use **Mark produce ready**, then **Confirm delivered to customer** after the
 physical handover. Explicit confirmation atomically updates the agreement,
-customer order and route stop, just like the action in **Orders & handovers**.
+customer order and route stop, just like the action in **Orders**.
 Ordinary route progress and legacy **Mark delivered** do not confirm an order.
 
 ### Pay-at-pickup checkout
@@ -68,7 +79,7 @@ When creating or editing a listing, choose a **Crop illustration** for
 Menurithm shoppers or keep **Automatic match**. Existing listings continue to
 use automatic matching until changed.
 
-In **Orders & handovers**, choose **Manage pickup windows** to publish a
+In **Orders**, choose **Manage pickup windows** to publish a
 future pickup window for in-stock listings. A window is a pickup time range,
 not a capacity limit. Restaurants can place a one-farm order at posted prices
 without farmer approval and pay the farmer directly at pickup. The cart does
@@ -80,6 +91,10 @@ Pausing a window prevents new orders without changing existing orders.
 Buyers can cancel the full order before any item is ready; farmers can cancel
 before any item is collected. Cancellation releases the committed stock.
 Missed pickups do not auto-cancel; farmers can cancel them to restock.
+The window manager lists upcoming bookable windows first. Choose a start
+time and set an end time manually or use a 30-, 60-, or 120-minute shortcut.
+Approved delivery windows are shown beside orders in Route Planner for review;
+the route preview is not a guarantee that every window can be met.
 
 ### Backend setup and deployment order
 
@@ -118,16 +133,16 @@ Croprithm handles delivery planning and operator-confirmed progress. Google Maps
 and Apple Maps handle turn-by-turn navigation; no native mobile app, embedded
 navigation SDK, background GPS or automatic proof of delivery is provided.
 
-1. Obtain customer approval for a farmer delivery quote (or accept a legacy
-   request), then open Route Planner.
+1. Obtain customer approval for a farmer delivery quote, then open Route Planner.
 2. Select accepted orders, choose **Use Selected as Stops**, and enter a pickup
    and route name. **Generate Route** shows an unsaved preview (manual addresses
    also work). **Save selected orders for delivery** optimizes and saves today's
    accepted-order itinerary to the backend.
-3. Open Google Maps or Apple Maps for a pickup or delivery stop. Coordinate
-   destinations are preferred; addresses are used when coordinates are missing
-   or invalid. The navigation provider starts from the user's current location
-   and may choose different roads, traffic estimates and arrival times.
+3. Use Google Maps or Apple Maps to preview each leg from the previous stop.
+   In a saved itinerary, **Go to next stop** jumps to the first unfinished,
+   non-skipped stop. Open either provider there to navigate from your current
+   location. Coordinates are preferred; addresses are used as fallback.
+   Maps may choose different roads, traffic estimates, and arrival times.
 4. Return to Croprithm while safely parked to record **En route**, **Arrived**,
    **Skip stop**, or **Reset**. For approved farmer deliveries, mark produce ready,
    then explicitly confirm delivery using the confirmation dialog. Historical

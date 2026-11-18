@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, MenuItem,
-  Stack, TextField, Typography,
+  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog,
+  DialogActions, DialogContent, DialogTitle, MenuItem,
+  Stack, Tab, Tabs, TextField, Typography,
 } from '@mui/material';
 import { auth } from '../hooks/initializeFirebase';
 import { BASE_URL } from '../utils';
 import { produceInventoryApi, type ProduceInventory } from '../api/produceApi';
 import { WorkspaceHeading, WorkspaceIcon } from './WorkspaceUI';
+import { fulfillmentWindowLabel as windowLabel, pickupWindowEnd, pickupWindowTimes } from '../utils/pickupWindows';
 
 interface Order {
   pickup_checkout_id?: number | null;
@@ -24,6 +26,31 @@ interface Quote {
   method: string; fee: string; pickup_address: string; instructions: string;
   produce_total: string; produce_inventory_id: number | '';
 }
+
+const stageLabels: Record<string, string> = {
+  requested: 'Quote needed', quoted: 'Awaiting customer approval', accepted: 'To prepare',
+  collected: 'Collected', delivered: 'Delivered', canceled: 'Canceled',
+};
+const stageLabel = (order: Order) => order.stage === 'ready'
+  ? order.method === 'customer_pickup' ? 'Ready for pickup' : 'Ready for delivery'
+  : stageLabels[order.stage] ?? order.stage.replace(/_/g, ' ');
+const fulfillmentLabel = (order: Order) => order.method === 'customer_pickup' ? 'Customer pickup' : 'Farmer delivery';
+const itemLabel = (order: Order) => `${order.quantity_needed} ${order.unit} ${order.produce_type}`;
+const orderReference = (order: Order) => order.pickup_checkout_id ? `Pickup #${order.pickup_checkout_id}` : `Request #${order.request_id}`;
+const views = [
+  { id: 'open', label: 'Open orders', stages: ['accepted', 'ready'], empty: 'No open orders', description: 'Confirmed orders appear here until they are collected or delivered.' },
+  { id: 'quotes', label: 'Quotes', stages: ['requested', 'quoted'], empty: 'No quotes or requests', description: 'Custom requests and quotes awaiting approval appear here.' },
+  { id: 'history', label: 'History', stages: ['collected', 'delivered', 'canceled'], empty: 'No order history yet', description: 'Collected, delivered, and canceled items appear here.' },
+] as const;
+type OrderView = (typeof views)[number]['id'];
+const inView = (order: Order, view: (typeof views)[number]) => view.stages.some(stage => stage === order.stage);
+const nextAction = (order: Order) => {
+  if (order.stage === 'requested') return 'Prepare quote';
+  if (order.stage === 'accepted') return 'Prepare produce';
+  if (order.stage === 'ready') return 'Review handover';
+  if (['collected', 'delivered'].includes(order.stage) && order.sale_total != null && !order.payment_recorded_at) return 'Review payment';
+  return 'View details';
+};
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const user = auth.currentUser;
@@ -47,25 +74,36 @@ export default function FulfillmentOrders() {
   const [windows, setWindows] = useState<PickupWindow[]>([]);
   const [windowForm, setWindowForm] = useState({ address: '', starts_at: '', ends_at: '' });
   const [showWindows, setShowWindows] = useState(false);
-  const [filter, setFilter] = useState("all");
+  const [windowError, setWindowError] = useState('');
+  const [windowNotice, setWindowNotice] = useState('');
+  const [activeView, setActiveView] = useState<OrderView>('open');
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const windowPath = 'marketplace/farmer/pickup-windows';
 
   const manageWindows = async (action: 'load' | 'post' | number) => {
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setWindowError(''); setWindowNotice('');
+    setShowWindows(true);
     try {
       if (action === 'post') {
-        await request<PickupWindow>(windowPath, { method: 'POST', body: JSON.stringify({
-          address: windowForm.address, starts_at: new Date(windowForm.starts_at).toISOString(),
-          ends_at: new Date(windowForm.ends_at).toISOString(),
-        }) });
-        setWindowForm({ address: '', starts_at: '', ends_at: '' });
+        const address = windowForm.address.trim();
+        if (!address) throw new Error('Enter a pickup address.');
+        const times = pickupWindowTimes(windowForm.starts_at, windowForm.ends_at);
+        const posted = await request<PickupWindow>(windowPath, {
+          method: 'POST', body: JSON.stringify({ address, ...times }),
+        });
+        setWindows(previous => [...previous, posted]);
+        setWindowForm({ address, starts_at: '', ends_at: '' });
+        setWindowNotice('Pickup window posted.');
       } else if (typeof action === 'number') {
-        await request<PickupWindow>(`${windowPath}/${action}/pause`, { method: 'POST' });
+        const paused = await request<PickupWindow>(`${windowPath}/${action}/pause`, { method: 'POST' });
+        setWindows(previous => previous.map(window => window.id === paused.id ? paused : window));
+        setWindowNotice('Pickup window paused. Existing orders are unchanged.');
+      } else {
+        setWindows(await request<PickupWindow[]>(windowPath));
       }
-      setWindows(await request<PickupWindow[]>(windowPath));
-      setShowWindows(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update pickup windows.');
+      setWindowError(err instanceof Error ? err.message : 'Unable to update pickup windows.');
     } finally { setBusy(false); }
   };
   const refresh = async () => {
@@ -93,14 +131,15 @@ export default function FulfillmentOrders() {
   const save = async (order: Order, action: 'quote' | 'stage', stage?: string) => {
     setBusy(true); setError(''); setNotice('');
     try {
-      await request<Order>(`farmer/orders/${order.id}/${action}`, {
+      const updated = await request<Order>(`farmer/orders/${order.id}/${action}`, {
         method: 'PUT', body: JSON.stringify(action === 'quote' ? {
           ...drafts[order.id], currency: 'USD', expected_revision: order.revision,
           fee: drafts[order.id].method === 'customer_pickup' ? '0.00' : drafts[order.id].fee,
         } : { stage }),
       });
+      setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
       await refresh();
-      setNotice(action === 'quote' ? 'Quote sent. Wait for the customer to accept before preparing delivery.' : 'Handover progress saved.');
+      setNotice(action === 'quote' ? 'Quote sent. Wait for the customer to accept before preparing produce.' : 'Handover progress saved.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to save. Refresh before retrying.'); }
     finally { setBusy(false); }
   };
@@ -127,76 +166,163 @@ export default function FulfillmentOrders() {
     } finally { setBusy(false); }
   };
 
-  const groups = [
-    { id: "all", label: "All orders", matches: (_order: Order) => true },
-    { id: "quotes", label: "Requests & quotes", matches: (order: Order) => ["requested", "quoted"].includes(order.stage) },
-    { id: "handover", label: "To prepare or hand over", matches: (order: Order) => ["accepted", "ready"].includes(order.stage) },
-    { id: "completed", label: "Completed", matches: (order: Order) => ["collected", "delivered"].includes(order.stage) },
-    { id: "canceled", label: "Canceled", matches: (order: Order) => order.stage === "canceled" },
-  ];
-  const visible = orders.filter(groups.find(group => group.id === filter)?.matches ?? groups[0].matches);
+  const view = views.find(candidate => candidate.id === activeView) ?? views[0];
+  const viewOrders = orders.filter(order => inView(order, view));
+  const visible = viewOrders
+    .filter(order => {
+      const searchable = `${order.restaurant_name} ${order.produce_type} ${orderReference(order)} request #${order.request_id}`.toLowerCase();
+      return query.trim().toLowerCase().split(/\s+/).every(term => searchable.includes(term));
+    });
+  if (activeView === 'open') visible.sort((a, b) => Date.parse(a.window_start) - Date.parse(b.window_start) || a.id - b.id);
+  const selectedOrder = orders.find(order => order.id === selectedId);
+  const now = Date.now();
+  const bookable = windows.filter(window => window.active && Date.parse(window.starts_at) > now)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const otherWindows = windows.filter(window => !bookable.includes(window))
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  const windowRow = (window: PickupWindow) => <Stack key={window.id} direction={{ xs: 'column', sm: 'row' }}
+    gap={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between"
+    sx={{ py: 1.25, borderTop: 1, borderColor: 'divider' }}>
+    <Box sx={{ overflowWrap: 'anywhere' }}>
+      <Typography fontWeight={650}>{windowLabel(window.starts_at, window.ends_at)}</Typography>
+      <Typography variant="body2" color="text.secondary">{window.address}</Typography>
+    </Box>
+    {bookable.includes(window) ? <Button disabled={busy} onClick={() => void manageWindows(window.id)}>Pause bookings</Button>
+      : <Chip size="small" label={!window.active ? 'Paused' : Date.parse(window.ends_at) <= now ? 'Ended' : 'In progress'} />}
+  </Stack>;
+  const closeDetails = () => {
+    if (busy) return;
+    setSelectedId(null);
+    if (!visible.some(order => order.id === selectedId)) {
+      requestAnimationFrame(() => document.getElementById(`orders-tab-${view.id}`)?.focus());
+    }
+  };
+  const openDetails = (order: Order) => {
+    setError('');
+    setNotice('');
+    setSelectedId(order.id);
+  };
 
   return (
     <Stack spacing={3}>
-      <WorkspaceHeading title="Orders & handovers"
-        description="Prepare pickup orders, respond to quote requests, and record handover and direct payment."
+      <WorkspaceHeading title="Orders"
+        description="See what to pack, who it’s for, and when it needs to be ready."
         actions={<Button variant="contained" startIcon={<WorkspaceIcon name="calendar" />} disabled={busy}
           aria-expanded={showWindows} aria-controls={showWindows ? "pickup-window-panel" : undefined}
           onClick={() => showWindows ? setShowWindows(false) : void manageWindows('load')}>Manage pickup windows</Button>} />
-      {error && <Alert severity="error" role="alert">{error}</Alert>}
-      {notice && <Alert severity="success" role="status">{notice}</Alert>}
+      {!selectedOrder && error && <Alert severity="error" role="alert">{error}</Alert>}
+      {!selectedOrder && notice && <Alert severity="success" role="status">{notice}</Alert>}
       {showWindows && <Card id="pickup-window-panel" variant="outlined"><CardContent><Stack spacing={2}>
-        <Typography variant="h6">Pickup windows</Typography>
-        <Typography variant="body2">Posting a window lets restaurants order your published, in-stock listings at their posted prices and pay you at pickup. A window can serve multiple orders. Pausing it stops new orders without changing existing ones.</Typography>
+        <Typography component="h2" variant="h6">Pickup windows</Typography>
+        <Typography variant="body2">Set when restaurants can collect orders. Pausing a window stops new bookings without changing existing orders.</Typography>
+        {windowError && <Alert severity="error">{windowError}</Alert>}
+        {windowNotice && <Alert severity="success" role="status">{windowNotice}</Alert>}
+        <Box>
+          <Typography component="h3" variant="subtitle1" fontWeight={700}>Open for booking ({bookable.length})</Typography>
+          {bookable.length ? bookable.map(windowRow) : <Typography variant="body2" color="text.secondary">
+            {busy ? 'Updating pickup windows…' : 'No upcoming windows open for booking.'}
+          </Typography>}
+        </Box>
         <Stack component="form" spacing={2} onSubmit={event => { event.preventDefault(); void manageWindows('post'); }}>
-          <TextField required label="Pickup address" value={windowForm.address}
+          <Typography component="h3" variant="subtitle1" fontWeight={700}>Post a new window</Typography>
+          <TextField required disabled={busy} label="Pickup address" value={windowForm.address}
             slotProps={{ htmlInput: { maxLength: 500 } }}
             onChange={event => {
               const value = (event.target as HTMLInputElement).value;
               setWindowForm(previous => ({ ...previous, address: value }));
             }} />
-          {(['starts_at', 'ends_at'] as const).map(field => <TextField key={field} required type="datetime-local"
+          <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
+          {(['starts_at', 'ends_at'] as const).map(field => <TextField key={field} required disabled={busy} fullWidth type="datetime-local"
             label={field === 'starts_at' ? 'Starts (local time)' : 'Ends (local time)'} value={windowForm[field]}
             slotProps={{ inputLabel: { shrink: true } }}
             onChange={event => {
               const value = (event.target as HTMLInputElement).value;
               setWindowForm(previous => ({ ...previous, [field]: value }));
             }} />)}
-          <Button type="submit" variant="contained" disabled={busy}>Post pickup window</Button>
+          </Stack>
+          <Stack direction="row" gap={1} useFlexGap flexWrap="wrap" alignItems="center">
+            <Typography variant="body2" color="text.secondary">Set end time:</Typography>
+            {[30, 60, 120].map(minutes => <Button key={minutes} size="small" variant="outlined"
+              disabled={busy || !windowForm.starts_at}
+              onClick={() => setWindowForm(previous => ({ ...previous, ends_at: pickupWindowEnd(previous.starts_at, minutes) }))}>
+              {minutes} min after start
+            </Button>)}
+          </Stack>
+          <Button type="submit" variant="contained" disabled={busy} sx={{ alignSelf: 'flex-start' }}>Post pickup window</Button>
         </Stack>
-        {windows.map(window => <Stack key={window.id} direction={{ xs: 'column', sm: 'row' }} gap={1} alignItems={{ sm: 'center' }}>
-          <Typography>{new Date(window.starts_at).toLocaleString()} to {new Date(window.ends_at).toLocaleString()} / {window.address}</Typography>
-          {window.active ? <Button disabled={busy} onClick={() => void manageWindows(window.id)}>Pause</Button> : <Chip label="Paused" />}
-        </Stack>)}
+        {!!otherWindows.length && <Box component="details">
+          <Box component="summary" sx={{ cursor: 'pointer', py: 1, fontWeight: 700 }}>Other windows ({otherWindows.length})</Box>
+          {otherWindows.map(windowRow)}
+        </Box>}
       </Stack></CardContent></Card>}
+      <Stack spacing={2} sx={{ minWidth: 0 }}>
+        <Tabs value={activeView} onChange={(_, value: OrderView) => setActiveView(value)}
+          aria-label="Order views" variant="scrollable" sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          {views.map(candidate => <Tab key={candidate.id} value={candidate.id} id={`orders-tab-${candidate.id}`}
+            aria-controls={`orders-panel-${candidate.id}`}
+            label={`${candidate.label}${loading && !orders.length ? '' : ` (${orders.filter(order => inView(order, candidate)).length})`}`}
+            sx={{ px: { xs: 1, sm: 2 }, minWidth: 0, textTransform: 'none' }} />)}
+        </Tabs>
+        <Stack role="tabpanel" id={`orders-panel-${view.id}`} aria-labelledby={`orders-tab-${view.id}`} spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} justifyContent="space-between">
-        <TextField select size="small" label="Order status" value={filter} sx={{ minWidth: { sm: 240 } }}
-          onChange={event => setFilter((event.target as HTMLInputElement).value)}>
-          {groups.map(group => <MenuItem key={group.id} value={group.id}>{group.label}</MenuItem>)}
-        </TextField>
-        <Button variant="outlined" startIcon={<WorkspaceIcon name="refresh" />} disabled={loading || busy} onClick={refresh}>Refresh orders</Button>
+        <TextField fullWidth size="small" label="Search orders" placeholder="Restaurant, produce, or order number"
+          value={query} onChange={event => setQuery((event.target as HTMLInputElement).value)} />
+        <Button variant="outlined" startIcon={<WorkspaceIcon name="refresh" />} disabled={loading || busy} onClick={refresh}
+          sx={{ flexShrink: 0 }}>Refresh orders</Button>
       </Stack>
-      {loading ? <CircularProgress aria-label="Loading orders" /> : visible.length === 0 && !error ?
+      {!!viewOrders.length && <Typography role="status" variant="body2" color="text.secondary">
+        Showing {visible.length} of {viewOrders.length} order items
+      </Typography>}
+      {loading && !orders.length ? <CircularProgress aria-label="Loading orders" /> : visible.length === 0 && !error ?
         <Card variant="outlined"><CardContent>
-          <Typography variant="h6">{orders.length ? "No orders match this status" : "No orders yet"}</Typography>
-          <Typography color="text.secondary">{orders.length ? "Choose another status to see more orders." : "Pickup orders and customer requests will appear here."}</Typography>
-          {filter !== "all" && <Button onClick={() => setFilter("all")}>Show all orders</Button>}
+          <Typography variant="h6">{query.trim() ? 'No orders match' : view.empty}</Typography>
+          <Typography color="text.secondary">{query.trim() ? 'Try another restaurant, produce name, or order number.' : view.description}</Typography>
+          {query.trim() && <Button onClick={() => setQuery('')}>Clear search</Button>}
         </CardContent></Card> : null}
-      {!loading && visible.map(order => {
+      {visible.length > 0 && <Card variant="outlined">
+        <Box component="ul" aria-label="Order items" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+          {visible.map(order => <Box component="li" key={order.id} sx={{
+            display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.15fr) minmax(0, 1fr) minmax(160px, auto)' },
+            gap: 1.5, alignItems: 'center', p: 2, overflowWrap: 'anywhere', '& + li': { borderTop: 1, borderColor: 'divider' },
+          }}>
+            <Box>
+              <Typography component="h2" fontWeight={750}>{itemLabel(order)}</Typography>
+              <Typography variant="body2" color="text.secondary">{order.restaurant_name} · {orderReference(order)}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2" fontWeight={650}>{fulfillmentLabel(order)}</Typography>
+              <Typography variant="body2" color="text.secondary">{windowLabel(order.window_start, order.window_end)}</Typography>
+            </Box>
+            <Stack direction={{ xs: 'row', md: 'column', lg: 'row' }} gap={1} alignItems="center"
+              justifyContent={{ xs: 'space-between', md: 'flex-end' }} flexWrap="wrap">
+              <Chip size="small" label={stageLabel(order)} color={order.stage === 'accepted' || order.stage === 'ready' ? 'success' : 'default'} />
+              <Button variant="outlined" size="small" aria-haspopup="dialog"
+                aria-label={`${nextAction(order)}: ${itemLabel(order)}, ${orderReference(order)}`}
+                onClick={() => openDetails(order)}>{nextAction(order)}</Button>
+            </Stack>
+          </Box>)}
+        </Box>
+      </Card>}
+        </Stack>
+      </Stack>
+      {(selectedOrder ? [selectedOrder] : []).map(order => {
         const draft = drafts[order.id];
         const canQuote = ['requested', 'quoted'].includes(order.stage);
         const completed = ['collected', 'delivered'].includes(order.stage);
         const matchingStock = inventory.filter(item => item.is_available && item.quantity_available >= order.quantity_needed
           && item.produce_type.trim().toLowerCase() === order.produce_type.trim().toLowerCase()
           && item.unit.trim().toLowerCase() === order.unit.trim().toLowerCase());
-        return <Card key={order.id} variant="outlined"><CardContent>
+        return <Dialog key={order.id} open onClose={closeDetails} fullWidth maxWidth="md" scroll="paper" aria-labelledby="order-details-title">
+          <DialogTitle id="order-details-title">{itemLabel(order)}</DialogTitle>
+          <DialogContent dividers>
           <Stack spacing={2}>
+            {error && <Alert severity="error" role="alert">{error}</Alert>}
+            {notice && <Alert severity="success" role="status">{notice}</Alert>}
             <Stack direction="row" justifyContent="space-between" gap={1} flexWrap="wrap">
-              <Box><Typography variant="h6">{order.quantity_needed} {order.unit} {order.produce_type}</Typography>
-                <Typography color="text.secondary">{order.restaurant_name} · Request #{order.request_id}</Typography></Box>
-              <Chip label={order.stage === 'quoted' ? 'Awaiting customer approval' : order.stage.replace(/_/g, ' ')} color={order.stage === 'accepted' ? 'success' : 'default'} />
+              <Typography sx={{ overflowWrap: 'anywhere' }}>{order.restaurant_name} · {orderReference(order)}</Typography>
+              <Chip label={stageLabel(order)} color={order.stage === 'accepted' || order.stage === 'ready' ? 'success' : 'default'} />
             </Stack>
-            <Typography variant="body2">Requested window: {new Date(order.window_start).toLocaleString()} – {new Date(order.window_end).toLocaleString()}</Typography>
+            <Typography variant="body2">{order.pickup_checkout_id ? 'Pickup window' : 'Requested window'}: {windowLabel(order.window_start, order.window_end)}</Typography>
             {order.customer_contact && <Typography sx={{ overflowWrap: 'anywhere' }}>Customer contact: {order.customer_contact}</Typography>}
             {order.special_requirements && <Alert severity="info" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>Customer requirements: {order.special_requirements}</Alert>}
             {order.delivery_address && <Typography sx={{ overflowWrap: 'anywhere' }}>Delivery address: {order.delivery_address}</Typography>}
@@ -239,7 +365,8 @@ export default function FulfillmentOrders() {
                 </Stack>
               </Box>
             ) : <>
-              {order.stage !== 'canceled' && <Typography fontWeight={650}>{order.method === 'customer_pickup' ? 'Customer pickup' : 'Farmer delivery'} · USD {order.fee} delivery fee · accepted quote {order.revision}</Typography>}
+              {order.stage !== 'canceled' && <Typography fontWeight={650}>{fulfillmentLabel(order)}
+                {order.pickup_checkout_id ? ' · Pay at pickup' : ` · USD ${order.fee} delivery fee · accepted quote ${order.revision}`}</Typography>}
               {order.pickup_address && <Typography sx={{ overflowWrap: 'anywhere' }}>Pickup: {order.pickup_address}</Typography>}
               <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{order.instructions}</Typography>
               {order.stage === 'accepted' && <Button sx={{ alignSelf: 'flex-start' }} variant="contained" disabled={busy}
@@ -251,7 +378,6 @@ export default function FulfillmentOrders() {
             </>}
             {order.sale_total != null && <Typography>Produce: USD {order.produce_total} · Delivery: USD {order.fee} · Total: USD {order.sale_total}</Typography>}
             {order.stock_reserved && <Chip sx={{ alignSelf: 'flex-start' }} label="Stock committed" color="success" />}
-            {order.pickup_checkout_id && <Chip sx={{ alignSelf: 'flex-start' }} label={`Pickup #${order.pickup_checkout_id} · Pay at pickup`} />}
             {order.payment_recorded_at && <Alert severity="success">Direct payment recorded {new Date(order.payment_recorded_at).toLocaleString()}.</Alert>}
             {completed && order.sale_total != null && !order.payment_recorded_at && <Button sx={{ alignSelf: 'flex-start' }}
               variant="contained" disabled={busy} onClick={() => void closeOrder(order, 'record-payment')}>
@@ -263,7 +389,9 @@ export default function FulfillmentOrders() {
                 {order.pickup_checkout_id ? 'Cancel entire pickup order' : 'Cancel order'}
               </Button>}
           </Stack>
-        </CardContent></Card>;
+          </DialogContent>
+          <DialogActions><Button disabled={busy} onClick={closeDetails}>Close</Button></DialogActions>
+        </Dialog>;
       })}
     </Stack>
   );

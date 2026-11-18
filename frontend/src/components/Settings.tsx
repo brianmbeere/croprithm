@@ -1,313 +1,247 @@
 import { useEffect, useState } from "preact/hooks";
 import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
-  Divider,
-  Grid,
-  Snackbar,
-  Stack,
-  TextField,
-  Typography,
+  Accordion, AccordionDetails, AccordionSummary, Alert, Avatar, Box, Button, Card,
+  CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  Divider, List, ListItemButton, ListItemIcon, ListItemText, Stack, TextField, Typography,
+  useMediaQuery, useTheme,
 } from "@mui/material";
-import { type FunctionalComponent } from "preact";
-import { type User } from "firebase/auth";
+import type { User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-
 import { db } from "../hooks/initializeFirebase";
+import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
+import type { WorkspacePage, WorkspaceRole } from "./workspaceSections";
 
-type UserProfile = {
-  role?: string;
-  organization?: string;
-  headquarters?: string;
-  businessPhone?: string;
-  industry?: string;
-  lastAuditNote?: string;
-  complianceBadge?: string;
+type BusinessProfile = {
+  organization: string;
+  headquarters: string;
+  businessPhone: string;
+  industry: string;
 };
 
-const defaultProfile: UserProfile = {
-  role: "",
-  organization: "",
-  headquarters: "",
-  businessPhone: "",
-  industry: "",
-  lastAuditNote: "",
-  complianceBadge: "",
+const emptyProfile: BusinessProfile = {
+  organization: "", headquarters: "", businessPhone: "", industry: "",
 };
 
-const normalizeProfile = (data?: UserProfile | null): UserProfile => ({
-  ...defaultProfile,
-  ...(data ?? {}),
-});
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "Not available";
-  return new Date(value).toLocaleString();
+const profileStore = {
+  async load(uid: string): Promise<BusinessProfile> {
+    const data = (await getDoc(doc(db, "users", uid))).data();
+    return {
+      organization: typeof data?.organization === "string" ? data.organization : "",
+      headquarters: typeof data?.headquarters === "string" ? data.headquarters : "",
+      businessPhone: typeof data?.businessPhone === "string" ? data.businessPhone : "",
+      industry: typeof data?.industry === "string" ? data.industry : "",
+    };
+  },
+  async save(uid: string, changes: Partial<BusinessProfile>) {
+    await setDoc(doc(db, "users", uid), { ...changes, updatedAt: new Date().toISOString() }, { merge: true });
+  },
 };
 
-const Settings: FunctionalComponent<{ user: User | null }> = ({ user }) => {
-  const [profile, setProfile] = useState<UserProfile>(defaultProfile);
-  const [draftProfile, setDraftProfile] = useState<UserProfile>(defaultProfile);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const shortcuts = {
+  farmer: [
+    { page: "inventory", icon: "inventory", label: "Inventory", description: "Update stock and manage produce listings." },
+    { page: "orders", icon: "calendar", label: "Orders & pickup windows", description: "Open Orders to manage when customers can collect." },
+    { page: "plan", icon: "route", label: "Route planning", description: "Plan deliveries and organize your stops." },
+  ],
+  restaurant: [
+    { page: "market", icon: "market", label: "Source produce", description: "Find farms and browse produce." },
+    { page: "saved", icon: "saved", label: "Saved routes", description: "View your saved itineraries." },
+  ],
+} as const;
+
+const providerLabel = (id: string) =>
+  ({ password: "Email & password", "google.com": "Google", "apple.com": "Apple" })[id] ?? id;
+
+function Detail({ label, value, empty = "Not added" }: { label: string; value?: string | null; empty?: string }) {
+  return <Box sx={{ minWidth: 0 }}>
+    <Typography component="dt" variant="body2" color="text.secondary">{label}</Typography>
+    <Typography component="dd" sx={{ m: 0, overflowWrap: "anywhere" }}>{value || empty}</Typography>
+  </Box>;
+}
+
+export default function Settings({ user, role, onPageChange, store = profileStore }: {
+  user: Pick<User, "uid" | "email" | "emailVerified" | "providerData" | "metadata">;
+  role: WorkspaceRole;
+  onPageChange: (page: WorkspacePage) => void;
+  store?: typeof profileStore;
+}) {
+  const [profile, setProfile] = useState<BusinessProfile | null>(null);
+  const [draft, setDraft] = useState<BusinessProfile>(emptyProfile);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const isMobile = useMediaQuery(useTheme().breakpoints.down("sm"));
+  const { uid } = user;
 
   useEffect(() => {
-    if (!user) {
-      setProfile(defaultProfile);
-      setDraftProfile(defaultProfile);
-      return;
-    }
+    let active = true;
+    store.load(uid).then(
+      data => { if (active) setProfile(data); },
+      error => {
+        console.error("Failed to load business profile", error);
+        if (active) setLoadError(true);
+      },
+    );
+    return () => { active = false; };
+  }, [store, uid, loadAttempt]);
 
-    let isSubscribed = true;
-    const fetchProfile = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const ref = doc(db, "users", user.uid);
-        const snapshot = await getDoc(ref);
-        if (isSubscribed) {
-          const hydrated = snapshot.exists()
-            ? normalizeProfile(snapshot.data() as UserProfile)
-            : defaultProfile;
-          setProfile(hydrated);
-          setDraftProfile(hydrated);
-        }
-      } catch (err) {
-        console.error("Failed to load profile", err);
-        if (isSubscribed) {
-          setError("Unable to load organization profile. Data exports will be limited until this is resolved.");
-        }
-      } finally {
-        if (isSubscribed) {
-          setLoading(false);
-        }
-      }
-    };
+  const nameLabel = role === "farmer" ? "Farm name" : "Restaurant name";
+  const roleLabel = role === "farmer" ? "Farmer" : "Restaurant";
+  const businessName = profile?.organization || `${roleLabel} workspace`;
+  const fields: { key: keyof BusinessProfile; label: string; autoComplete?: string; type?: string }[] = [
+    { key: "organization", label: nameLabel, autoComplete: "organization" },
+    { key: "headquarters", label: "Business location", autoComplete: "street-address" },
+    { key: "businessPhone", label: "Business phone", autoComplete: "tel", type: "tel" },
+    { key: "industry", label: "Industry" },
+  ];
+  const changes: Partial<BusinessProfile> = {};
+  for (const { key } of fields) {
+    if (profile && draft[key].trim() !== profile[key].trim()) changes[key] = draft[key].trim();
+  }
+  const isDirty = Object.keys(changes).length > 0;
+  const providers = [...new Set(user.providerData.map(provider => providerLabel(provider.providerId)))];
+  const lastSignIn = user.metadata.lastSignInTime;
 
-    fetchProfile();
-    return () => {
-      isSubscribed = false;
-    };
-  }, [user?.uid]);
-
-  const provider = user?.providerData?.[0]?.providerId ?? "password";
-  const complianceLabel =
-    draftProfile.complianceBadge ||
-    profile.complianceBadge ||
-    ((draftProfile.role || profile.role) ? "Active" : "Unverified");
-
-  const handleFieldChange = (field: keyof UserProfile) => (event: Event) => {
-    const value = (event.target as HTMLInputElement).value;
-    setDraftProfile((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const openEditor = () => {
+    if (!profile) return;
+    setDraft(profile);
+    setSaveError(false);
+    setSaved(false);
+    setEditing(true);
   };
-
-  const handleSave = async () => {
-    if (!user) return;
+  const closeEditor = () => { if (!saving) setEditing(false); };
+  const save = async () => {
+    if (!profile || !isDirty || saving) return;
     setSaving(true);
-    setError(null);
+    setSaveError(false);
     try {
-      const ref = doc(db, "users", user.uid);
-      const payload = {
-        ...draftProfile,
-        updatedAt: new Date().toISOString(),
-      };
-      await setDoc(ref, payload, { merge: true });
-      setProfile(normalizeProfile(draftProfile));
-      setShowSuccess(true);
-    } catch (err) {
-      console.error("Failed to save profile", err);
-      setError("Unable to save organization profile. Retry or capture backend logs for evidence.");
+      await store.save(uid, changes);
+      setProfile({ ...profile, ...changes });
+      setEditing(false);
+      setSaved(true);
+    } catch (error) {
+      console.error("Failed to save business profile", error);
+      setSaveError(true);
     } finally {
       setSaving(false);
     }
   };
 
-  const isDirty = JSON.stringify(draftProfile) !== JSON.stringify(profile);
-  const orgProfileComplete = Boolean(
-    draftProfile.organization && draftProfile.industry && draftProfile.headquarters
-  );
+  return <Stack spacing={3} sx={{ maxWidth: 1040 }}>
+    <WorkspaceHeading title="Settings" description="Manage your business profile and review your sign-in details." />
 
-  if (!user) {
-    return (
-      <Box>
-        <Typography variant="h5" gutterBottom>
-          Settings
-        </Typography>
-        <Alert severity="info">Sign in to review account metadata.</Alert>
-      </Box>
-    );
-  }
+    <Card variant="outlined">
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar aria-hidden="true" sx={{ bgcolor: "primary.main", color: "primary.contrastText", width: 52, height: 52 }}>
+            <WorkspaceIcon name={role === "farmer" ? "inventory" : "market"} />
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h2" variant="h6" fontWeight={700} sx={{ overflowWrap: "anywhere" }}>{businessName}</Typography>
+            <Typography variant="body2" color="text.secondary">{roleLabel} account</Typography>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
 
-  return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Account & Compliance Center
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Export this panel alongside screenshots to document authorship, access level, and organization ownership for your NIW evidence packet.
-      </Typography>
+    <Box sx={{ display: "grid", gap: 2.5, alignItems: "start", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 3fr) minmax(0, 2fr)" } }}>
+      <Stack spacing={2.5}>
+        <Card variant="outlined" component="section" aria-labelledby="business-profile-heading">
+          <CardContent>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                <Box>
+                  <Typography id="business-profile-heading" component="h2" variant="h6">Business profile</Typography>
+                  <Typography variant="body2" color="text.secondary">Your business name, location and contact details.</Typography>
+                </Box>
+                {profile && <Button variant="outlined" onClick={openEditor} aria-label="Edit business profile" sx={{ flexShrink: 0 }}>Edit</Button>}
+              </Stack>
+              {saved && <Alert severity="success" role="status" onClose={() => setSaved(false)}>Business profile saved.</Alert>}
+              {loadError ? <Alert severity="error" action={<Button color="inherit" onClick={() => {
+                setLoadError(false);
+                setLoadAttempt(attempt => attempt + 1);
+              }}>Retry</Button>}>Couldn’t load your business profile.</Alert>
+                : profile ? <Box component="dl" sx={{ m: 0, display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" } }}>
+                  {fields.map(({ key, label }) => <Detail key={key} label={label} value={profile[key]} />)}
+                </Box> : <CircularProgress size={24} aria-label="Loading business profile" />}
+            </Stack>
+          </CardContent>
+        </Card>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        <Card variant="outlined" component="section" aria-labelledby="sign-in-heading">
+          <CardContent>
+            <Typography id="sign-in-heading" component="h2" variant="h6">Sign-in details</Typography>
+            <Typography variant="body2" color="text.secondary">The account you use to access Croprithm.</Typography>
+            <Stack component="dl" spacing={1.5} sx={{ mb: 0 }}>
+              <Detail label="Sign-in email" value={user.email} empty="Not available" />
+              {user.email && <Box component="div">
+                <Typography component="dt" variant="body2" color="text.secondary">Email verification</Typography>
+                <Box component="dd" sx={{ m: 0, mt: 0.5 }}>
+                  <Chip size="small" label={user.emailVerified ? "Verified" : "Not verified"} />
+                </Box>
+              </Box>}
+            </Stack>
+          </CardContent>
+          <Divider />
+          <Accordion disableGutters elevation={0} square sx={{ "&::before": { display: "none" } }}>
+            <AccordionSummary id="account-details-toggle" aria-controls="account-details-panel"
+              expandIcon={<Box sx={{ display: "flex", transform: "rotate(90deg)" }}><WorkspaceIcon name="arrow" /></Box>}>
+              More account details
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack component="dl" spacing={1.5} sx={{ m: 0 }}>
+                <Detail label="Sign-in method" value={providers.join(", ")} empty="Not available" />
+                <Detail label="Last sign-in" value={lastSignIn ? new Date(lastSignIn).toLocaleString() : null} empty="Not available" />
+                <Detail label="Account ID" value={uid} />
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+        </Card>
+      </Stack>
 
-      {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight={240}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
-                  <Typography variant="h6">Account Overview</Typography>
-                  <Chip label={complianceLabel} color={complianceLabel === "Active" ? "success" : "warning"} size="small" />
-                </Stack>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1.5}>
-                  <Typography variant="body2">Email: <strong>{user.email}</strong></Typography>
-                  <Typography variant="body2">UID: <strong>{user.uid}</strong></Typography>
-                  <Typography variant="body2">Role: <strong>{profile.role || "Not assigned"}</strong></Typography>
-                  <Typography variant="body2">Provider: <strong>{provider}</strong></Typography>
-                  <Typography variant="body2">
-                    Email Verified:
-                    <Chip
-                      label={user.emailVerified ? "Verified" : "Pending"}
-                      color={user.emailVerified ? "success" : "warning"}
-                      size="small"
-                      sx={{ ml: 1 }}
-                    />
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Organization Profile
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1.5}>
-                  <TextField
-                    label="Organization"
-                    value={draftProfile.organization}
-                    onChange={handleFieldChange("organization")}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Industry"
-                    value={draftProfile.industry}
-                    onChange={handleFieldChange("industry")}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Headquarters"
-                    value={draftProfile.headquarters}
-                    onChange={handleFieldChange("headquarters")}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Primary Phone"
-                    value={draftProfile.businessPhone}
-                    onChange={handleFieldChange("businessPhone")}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Latest Audit Note"
-                    multiline
-                    minRows={2}
-                    value={draftProfile.lastAuditNote}
-                    onChange={handleFieldChange("lastAuditNote")}
-                    size="small"
-                    fullWidth
-                    helperText="Capture diligence performed before exporting evidence."
-                  />
-                  <TextField
-                    label="Compliance Badge"
-                    value={draftProfile.complianceBadge}
-                    onChange={handleFieldChange("complianceBadge")}
-                    size="small"
-                    fullWidth
-                    helperText="Examples: Active, Needs Review, Internal Only"
-                  />
-                  <Button
-                    variant="contained"
-                    onClick={handleSave}
-                    disabled={saving || !isDirty}
-                  >
-                    {saving ? "Saving..." : "Save Organization Profile"}
-                  </Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Access Timeline
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1.5}>
-                  <Typography variant="body2">Account Created: <strong>{formatDate(user.metadata?.creationTime ?? null)}</strong></Typography>
-                  <Typography variant="body2">Last Login: <strong>{formatDate(user.metadata?.lastSignInTime ?? null)}</strong></Typography>
-                  <Typography variant="body2">Report Export Window: <strong>{new Date().toLocaleDateString()}</strong></Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Evidence Checklist
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1}>
-                  <Typography variant="body2">✔ Account ownership established via UID + email</Typography>
-                  <Typography variant="body2">✔ Role alignment: {profile.role || "role pending"}</Typography>
-                  <Typography variant="body2">
-                    {orgProfileComplete ? "✔" : "⬜"} Organization metadata synced from Firestore
-                  </Typography>
-                  <Typography variant="body2">⬜ Attach current analytics screenshots</Typography>
-                  <Typography variant="body2">⬜ Include backend commit references</Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
-      <Snackbar
-        open={showSuccess}
-        autoHideDuration={4000}
-        onClose={() => setShowSuccess(false)}
-        message="Organization profile saved"
-      />
+      <Card variant="outlined" component="section" aria-labelledby="workspace-shortcuts-heading">
+        <CardContent sx={{ pb: 1, "&:last-child": { pb: 1 } }}>
+          <Typography id="workspace-shortcuts-heading" component="h2" variant="h6">Workspace shortcuts</Typography>
+          <Typography variant="body2" color="text.secondary">Jump to tools you use for day-to-day work.</Typography>
+        </CardContent>
+        <List disablePadding>
+          {shortcuts[role].map(({ page, icon, label, description }, index) =>
+            <Box component="li" key={page}>
+              <ListItemButton divider={index < shortcuts[role].length - 1} onClick={() => onPageChange(page)} sx={{ gap: 1, py: 1.25 }}>
+                <ListItemIcon sx={{ minWidth: 30, color: "primary.main" }}><WorkspaceIcon name={icon} /></ListItemIcon>
+                <ListItemText primary={label} secondary={description} />
+                <Box sx={{ display: "flex", flexShrink: 0, color: "text.secondary" }}><WorkspaceIcon name="arrow" /></Box>
+              </ListItemButton>
+            </Box>,
+          )}
+        </List>
+      </Card>
     </Box>
-  );
-};
 
-export default Settings;
+    <Dialog open={editing} onClose={closeEditor} fullWidth fullScreen={isMobile} maxWidth="sm" aria-labelledby="edit-business-heading">
+      <Box component="form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+        <DialogTitle id="edit-business-heading">Edit business profile</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            {saveError && <Alert severity="error">Couldn’t save your changes. Try again.</Alert>}
+            {fields.map(({ key, label, autoComplete, type }, index) =>
+              <TextField key={key} label={label} autoFocus={index === 0} fullWidth
+                autoComplete={autoComplete} type={type} value={draft[key]} disabled={saving}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setDraft(previous => ({ ...previous, [key]: value }));
+                }} />,
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={closeEditor} disabled={saving}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={saving || !isDirty}>{saving ? "Saving..." : "Save changes"}</Button>
+        </DialogActions>
+      </Box>
+    </Dialog>
+  </Stack>;
+}

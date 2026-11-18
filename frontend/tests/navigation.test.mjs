@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { navigationLinks } from "../src/utils/navigation.ts";
+import { pickupWindowEnd, pickupWindowTimes } from "../src/utils/pickupWindows.ts";
 
 test("prefers coordinates in latitude,longitude order including zero", () => {
   const links = navigationLinks({ address: "Farm", latitude: 0, longitude: 36.8 });
@@ -35,4 +36,27 @@ test("missing destinations are unavailable; valid coordinates need no address", 
   assert.equal(navigationLinks({ address: "", latitude: 91, longitude: 0 }), null);
   assert.equal(new URL(navigationLinks({ address: "", latitude: -90, longitude: -180 }).apple)
     .searchParams.get("daddr"), "-90,-180");
+});
+
+test("planned legs use the previous stop as origin on both providers", () => {
+  const links = navigationLinks({ address: "Farm & Market" }, { address: "Previous", latitude: 0, longitude: 36.8 });
+  const google = new URL(links.google);
+  const apple = new URL(links.apple);
+  assert.equal(google.searchParams.get("origin"), "0,36.8");
+  assert.equal(google.searchParams.get("destination"), "Farm & Market");
+  assert.equal(google.searchParams.has("dir_action"), false);
+  assert.equal(apple.searchParams.get("saddr"), "0,36.8");
+  assert.equal(apple.searchParams.get("daddr"), "Farm & Market");
+});
+
+test("pickup presets cross midnight and validation rejects past or reversed windows", () => {
+  const start = "2030-07-14T23:30";
+  const end = pickupWindowEnd(start, 60);
+  assert.equal(end, "2030-07-15T00:30");
+  const now = +new Date("2030-07-14T12:00");
+  assert.deepEqual(pickupWindowTimes(start, end, now), {
+    starts_at: new Date(start).toISOString(), ends_at: new Date(end).toISOString(),
+  });
+  assert.throws(() => pickupWindowTimes(start, end, +new Date(start)), /future/);
+  assert.throws(() => pickupWindowTimes(start, start, now), /after the start/);
 });

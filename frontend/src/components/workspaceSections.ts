@@ -6,7 +6,7 @@ export const workspaceSections = {
     { label: "Farm", items: [
       { id: "overview", label: "Overview", icon: "overview" },
       { id: "inventory", label: "Inventory", icon: "inventory" },
-      { id: "orders", label: "Orders & handovers", icon: "orders" },
+      { id: "orders", label: "Orders", icon: "orders" },
     ] },
     { label: "Delivery", items: [
       { id: "plan", label: "Route planning", icon: "route" },
@@ -14,7 +14,6 @@ export const workspaceSections = {
     ] },
     { label: "Manage", items: [
       { id: "analytics", label: "Analytics", icon: "analytics" },
-      { id: "legacy", label: "Legacy requests", icon: "archive" },
       { id: "settings", label: "Settings", icon: "account" },
     ] },
   ],

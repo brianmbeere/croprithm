@@ -9,7 +9,6 @@ const paths = {
   saved: "M5 3h14v18l-7-4-7 4z",
   analytics: "M3 3v18h18 M8 16v-4 M13 16V8 M18 16V5",
   account: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z",
-  archive: "M4 8v13h16V8 M3 3h18v5H3z M9 12h6",
   market: "M3 10l2-6h14l2 6 M3 10v2a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0v-2H3 M5 15v6h14v-6",
   menu: "M4 6h16 M4 12h16 M4 18h16",
   logout: "M10 4H4v16h6 M9 12h12 M17 8l4 4-4 4",

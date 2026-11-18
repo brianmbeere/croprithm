@@ -14,11 +14,9 @@ import RoutePlanner from "./RoutePlanner";
 import SavedRoutes from "../components/SavedRoutes";
 import SourcingInsights from "../components/ProduceInsights";
 import ProduceAnalytics from "../components/ProduceAnalytics";
-import ProduceRequestFeed from "../components/ProduceRequestFeed";
 import ProduceInventoryManager from "../components/ProduceInventoryManager";
 import FarmFinder from "../components/FarmFinder";
 import Settings from "../components/Settings";
-import { SelectedRequestsProvider } from "../context/SelectedRequestsContext";
 import FulfillmentOrders from "../components/FulfillmentOrders";
 
 const Dashboard: FunctionalComponent = () => {
@@ -84,8 +82,7 @@ const Dashboard: FunctionalComponent = () => {
       case "plan": return <RoutePlanner />;
       case "saved": return <SavedRoutes />;
       case "analytics": return role === "farmer" ? <ProduceAnalytics /> : <SourcingInsights />;
-      case "settings": return <Settings user={user} />;
-      case "legacy": return <ProduceRequestFeed />;
+      case "settings": return user && role && <Settings key={user.uid} user={user} role={role} onPageChange={setPage} />;
       case "market": return <FarmFinder />;
     }
   };
@@ -96,12 +93,12 @@ const Dashboard: FunctionalComponent = () => {
   if (!role) return <Box p={3}><Alert severity="warning">Your account needs a farmer or restaurant role. Please contact support.</Alert></Box>;
 
   return (
-    <SelectedRequestsProvider>
+    <>
       <CssBaseline />
       <WorkspaceLayout role={role} page={page} onPageChange={setPage} onLogout={() => void handleLogout()}>
         {getTabContent()}
       </WorkspaceLayout>
-    </SelectedRequestsProvider>
+    </>
   );
 };
 

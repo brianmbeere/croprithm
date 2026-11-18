@@ -1,5 +1,4 @@
-import { useState, useContext, useEffect } from "preact/hooks";
-import { SelectedRequestsContext } from "../context/SelectedRequestsContext";
+import { useState, useEffect } from "preact/hooks";
 import {
   Container,
   Button,
@@ -33,16 +32,11 @@ import AutocompleteTextField from "../components/route/AutoCompleteTextField";
 import { WorkspaceHeading, WorkspaceIcon } from '../components/WorkspaceUI';
 import NavigationButtons from "../components/route/NavigationButtons";
 import DeliveryItinerary from "../components/route/DeliveryItinerary";
+import { fulfillmentWindowLabel } from "../utils/pickupWindows";
 
 const RoutePlanner: FunctionalComponent = () => {
-  const ctx = useContext(SelectedRequestsContext);
   const [pickup, setPickup] = useState("");
-  // If there are selected requests, use their addresses as stops; otherwise, default to one empty stop
-  const [stops, setStops] = useState<{ address: string }[]>(
-    ctx?.selectedRequests && ctx.selectedRequests.length > 0
-      ? ctx.selectedRequests.map(req => ({ address: req.location.address }))
-      : [{ address: "" }]
-  );
+  const [stops, setStops] = useState<{ address: string }[]>([{ address: "" }]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<OptimizeRouteResponse | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -144,20 +138,6 @@ const RoutePlanner: FunctionalComponent = () => {
       setRemovingOrderId(null);
     }
   };
-
-  // If selectedRequests changes, update stops accordingly (but only if not already matching)
-  useEffect(() => {
-    if (ctx?.selectedRequests && ctx.selectedRequests.length > 0) {
-      const selectedAddresses = ctx.selectedRequests.map(req => req.location.address);
-      // Only update stops if they don't match the selected addresses
-      if (
-        stops.length !== selectedAddresses.length ||
-        stops.some((stop, i) => stop.address !== selectedAddresses[i])
-      ) {
-        setStops(selectedAddresses.map(address => ({ address })));
-      }
-    }
-  }, [ctx?.selectedRequests]);
 
   const handleStopChange = (index: number, value: string) => {
     const updated = [...stops];
@@ -270,7 +250,7 @@ const RoutePlanner: FunctionalComponent = () => {
           </Box>
         ) : acceptedOrders.length === 0 ? (
           <Alert severity="info">
-            No approved delivery orders yet. Quote farmer delivery in Orders & handovers and wait for customer approval. Pickup orders do not appear here.
+            No approved delivery orders yet. Quote farmer delivery in Orders and wait for customer approval. Pickup orders do not appear here.
           </Alert>
         ) : (
           <Box sx={{ maxHeight: 200, overflowY: "auto" }}>
@@ -313,8 +293,11 @@ const RoutePlanner: FunctionalComponent = () => {
                       variant="outlined" 
                     />
                   </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                    {order.delivery_address}
+                  </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    📍 {order.delivery_address}
+                    Delivery window: {fulfillmentWindowLabel(order.delivery_window_start, order.delivery_window_end)}
                   </Typography>
                 </Box>
                 <Tooltip title="Remove from accepted orders">
@@ -337,20 +320,6 @@ const RoutePlanner: FunctionalComponent = () => {
           </Box>
         )}
       </Paper>
-
-      {/* Show selected produce requests as stops, if any */}
-      {ctx?.selectedRequests && ctx.selectedRequests.length > 0 && (
-        <Paper elevation={2} sx={{ p: 2, mb: 3, bgcolor: '#f5f5f5' }}>
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            Selected Produce Requests:
-          </Typography>
-          {ctx.selectedRequests.map((req) => (
-            <Box key={req.id} sx={{ mb: 1 }}>
-              <strong>{req.restaurantName}</strong> — {req.produce} — {req.location.address}
-            </Box>
-          ))}
-        </Paper>
-      )}
 
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <Box
@@ -404,15 +373,23 @@ const RoutePlanner: FunctionalComponent = () => {
                 Estimated {result.total_distance_miles.toFixed(1)} miles · {result.total_eta} minutes
               </Typography>
               <Alert severity="warning" sx={{ mb: 2 }}>Preview only. Save accepted orders above to retain delivery progress.</Alert>
-              <Stack spacing={2}>
+              <Typography component="h3" variant="subtitle1" fontWeight={700}>Stop order</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Preview each leg from the previous stop. In a saved route, open directions from your current location.
+              </Typography>
+              <Stack component="ol" spacing={2} sx={{ listStyle: "none", m: 0, p: 0 }}>
                 {result.stops.map((stop, index) => (
-                  <Paper variant="outlined" key={index} sx={{ p: 2, overflowWrap: "anywhere" }}>
+                  <Paper component="li" variant="outlined" key={index} sx={{ p: 2, overflowWrap: "anywhere" }}>
                     <Typography fontWeight="bold" sx={{ mb: 1 }}>
                       {index === 0 ? "Pickup" : `Stop ${index}`}: {stop.address}
                     </Typography>
                     <NavigationButtons destination={{
                       address: stop.address, longitude: stop.location[0], latitude: stop.location[1],
-                    }} />
+                    }} origin={index > 0 ? {
+                      address: result.stops[index - 1].address,
+                      longitude: result.stops[index - 1].location[0],
+                      latitude: result.stops[index - 1].location[1],
+                    } : undefined} />
                   </Paper>
                 ))}
               </Stack>

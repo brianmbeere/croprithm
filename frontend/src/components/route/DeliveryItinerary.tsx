@@ -43,7 +43,7 @@ export default function DeliveryItinerary({ routeId, editable, handoverEditable 
     setLoading(true);
     setError(null);
     deliveryRouteApi.getStops(routeId).then(data => {
-      if (current) setStops(data);
+      if (current) setStops([...data].sort((a, b) => a.stop_order - b.stop_order));
     }).catch(err => {
       console.error("Could not load delivery stops", err);
       if (current) setError("Could not load saved stops. Check your connection and retry.");
@@ -68,6 +68,7 @@ export default function DeliveryItinerary({ routeId, editable, handoverEditable 
 
   if (loading) return <CircularProgress aria-label="Loading saved delivery stops" />;
   const next = stops.find(stop => !["delivered", "skipped"].includes(stop.status));
+  const delivered = stops.filter(stop => stop.status === "delivered").length;
   return (
     <Stack spacing={2}>
       <Typography variant="h6">Delivery itinerary</Typography>
@@ -80,8 +81,17 @@ export default function DeliveryItinerary({ routeId, editable, handoverEditable 
       {notice && <Alert severity="success" role="status">{notice}</Alert>}
       {error && <Alert severity="error" action={<Button onClick={() => setReload(n => n + 1)}>Reload</Button>}>{error}</Alert>}
       {!stops.length && <Alert severity="warning">This route has no saved delivery stops.</Alert>}
+      {!!stops.length && <Stack direction={{ xs: "column", sm: "row" }} gap={1} justifyContent="space-between">
+        <Typography variant="body2" role="status">{delivered} of {stops.length} stops delivered</Typography>
+        {editable && next && <Button component="a" href={`#delivery-stop-${routeId}-${next.id}`} size="small">
+          Go to next stop
+        </Button>}
+      </Stack>}
+      <Stack component="ol" spacing={2} sx={{ listStyle: "none", m: 0, p: 0 }}>
       {stops.map(stop => (
-        <Paper key={stop.id} variant="outlined" sx={{ p: 2, overflowWrap: "anywhere" }}>
+        <Paper component="li" id={`delivery-stop-${routeId}-${stop.id}`} key={stop.id} variant="outlined"
+          sx={{ p: 2, overflowWrap: "anywhere", scrollMarginTop: 80,
+            ...(editable && stop.id === next?.id ? { borderColor: "primary.main", borderLeftWidth: 3 } : {}) }}>
           <Stack spacing={1.5}>
             <Box>
               <Typography fontWeight="bold">{stop.stop_order}. {stop.address}</Typography>
@@ -116,6 +126,7 @@ export default function DeliveryItinerary({ routeId, editable, handoverEditable 
           </Stack>
         </Paper>
       ))}
+      </Stack>
       <Typography variant="body2" color="text.secondary">
         Resolve skipped stops before completing the route. Maps may choose different roads and travel times from this plan.
         Only update progress when safely parked.

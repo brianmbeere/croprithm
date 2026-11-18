@@ -69,7 +69,8 @@ trust. Only server-to-server code may possess the shared key. Unconfigured
 bridge access does not bypass Firebase authentication.
 
 `GET /api/requests?delivery_only=true` excludes new pickup/unapproved agreements.
-`legacy_only=true` returns historical orders for the legacy request feed.
+`legacy_only=true` still returns historical orders for API consumers. The
+dashboard no longer has a separate legacy request feed.
 Legacy status/delivery updates reject agreement orders with 409. Route creation
 independently enforces approved farmer-delivery eligibility.
 
@@ -409,10 +410,9 @@ python migrate_db.py
 ## Integration with Frontend
 
 The frontend can now:
-1. Display produce requests from Menurithm in the ProduceRequestFeed
-2. Allow farmers to accept/decline requests
-3. Generate optimized delivery routes from selected requests
-4. View analytics and performance metrics
+1. Manage pickup orders and custom quotes in Orders.
+2. Generate optimized delivery routes from eligible accepted orders.
+3. View analytics and performance metrics.
 
 ## Next Steps
 

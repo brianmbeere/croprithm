@@ -25,6 +25,10 @@ import {
 import { WorkspaceHeading, WorkspaceIcon } from "./WorkspaceUI";
 import { produceInventoryApi, type ProduceIllustration, type ProduceInventory } from "../api/produceApi";
 
+const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const totalStock = (item: ProduceInventory) => Number((item.quantity_available + (item.quantity_committed ?? 0)).toPrecision(12));
+const stockColumns = "minmax(160px, 2fr) repeat(3, minmax(75px, 1fr)) minmax(108px, 1fr) minmax(148px, auto)";
+
 const ProduceInventoryManager = () => {
   const [inventory, setInventory] = useState<ProduceInventory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,10 +59,28 @@ const ProduceInventoryManager = () => {
   const [loadingIllustrations, setLoadingIllustrations] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [selectedItem, setSelectedItem] = useState<ProduceInventory | null>(null);
+  const [detail, setDetail] = useState<ProduceInventory | null>(null);
+  const [stockItem, setStockItem] = useState<ProduceInventory | null>(null);
+  const [stockDraft, setStockDraft] = useState("");
+  const [stockError, setStockError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     loadInventory();
+    void loadIllustrations();
   }, []);
+
+  const loadIllustrations = async () => {
+    setLoadingIllustrations(true);
+    setIllustrationError("");
+    try {
+      setIllustrations(await produceInventoryApi.getIllustrations());
+    } catch (err) {
+      setIllustrationError(err instanceof Error ? err.message : "Could not load crop illustrations.");
+    } finally {
+      setLoadingIllustrations(false);
+    }
+  };
 
   const loadInventory = async () => {
     try {
@@ -114,12 +136,7 @@ const ProduceInventoryManager = () => {
     }
     setDialogOpen(true);
     if (!illustrations.length && !loadingIllustrations) {
-      setLoadingIllustrations(true);
-      setIllustrationError('');
-      void produceInventoryApi.getIllustrations()
-        .then(setIllustrations)
-        .catch(err => setIllustrationError(err instanceof Error ? err.message : 'Could not load crop illustrations.'))
-        .finally(() => setLoadingIllustrations(false));
+      void loadIllustrations();
     }
   };
 
@@ -183,24 +200,51 @@ const ProduceInventoryManager = () => {
     }
   };
 
-  const updateStock = async (item: ProduceInventory) => {
-    const entered = window.prompt(`New available count (${item.unit}), excluding ${item.quantity_committed ?? 0} already committed:`, String(item.quantity_available));
-    if (entered === null) return;
-    const quantity = Number(entered);
-    if (!entered.trim() || !Number.isFinite(quantity) || quantity < 0) {
-      setError('Enter an available quantity of zero or more.');
+  const openStock = (item: ProduceInventory) => {
+    setStockItem(item);
+    setStockDraft(String(item.quantity_available));
+    setStockError("");
+    setNotice("");
+  };
+
+  const updateStock = async () => {
+    if (!stockItem || submitting) return;
+    const quantity = Number(stockDraft);
+    if (!stockDraft.trim() || !Number.isFinite(quantity) || quantity < 0) {
+      setStockError("Enter an available quantity of zero or more.");
       return;
     }
-    setSubmitting(true); setError('');
+    setSubmitting(true); setStockError(""); setError(null);
     try {
-      await produceInventoryApi.update(item.id, {
-        quantity_available: quantity, expected_quantity_available: item.quantity_available,
+      const updated = await produceInventoryApi.update(stockItem.id, {
+        quantity_available: quantity, expected_quantity_available: stockItem.quantity_available,
       });
-      await loadInventory();
+      setInventory(previous => previous.map(item => item.id === updated.id ? updated : item));
+      setNotice(`${updated.produce_type} stock updated to ${updated.quantity_available} ${updated.unit} available.`);
+      setStockItem(null);
     } catch (err) {
-      await loadInventory();
-      setError(err instanceof Error ? err.message : 'Failed to update stock.');
+      setStockError(err instanceof Error ? err.message : "Failed to update stock.");
     } finally { setSubmitting(false); }
+  };
+
+  const reloadStock = async () => {
+    if (!stockItem || submitting) return;
+    setSubmitting(true);
+    try {
+      const current = await produceInventoryApi.getSellerInventory();
+      setInventory(current);
+      const updated = current.find(item => item.id === stockItem.id);
+      if (updated) {
+        openStock(updated);
+      } else {
+        setStockItem(null);
+        setError("This listing no longer exists.");
+      }
+    } catch (err) {
+      setStockError(err instanceof Error ? err.message : "Could not refresh inventory.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const toggleListing = async (item: ProduceInventory) => {
@@ -237,9 +281,11 @@ const ProduceInventoryManager = () => {
 
   const published = (item: ProduceInventory) => item.is_available && item.quantity_available > 0;
   const counts = [
+    { id: "all", label: "All listings", items: inventory },
     { id: "published", label: "Published and in stock", items: inventory.filter(published) },
     { id: "committed", label: "With committed stock", items: inventory.filter(item => item.quantity_committed > 0) },
-    { id: "inactive", label: "Paused or sold out", items: inventory.filter(item => !published(item)) },
+    { id: "inactive", label: "Paused", items: inventory.filter(item => !item.is_available) },
+    { id: "soldout", label: "Sold out", items: inventory.filter(item => item.is_available && item.quantity_available <= 0) },
   ];
   const visible = (counts.find(group => group.id === status)?.items ?? inventory).filter(item =>
     [item.produce_type, item.variety, item.location].some(value => value?.toLowerCase().includes(query.trim().toLowerCase())));
@@ -249,23 +295,17 @@ const ProduceInventoryManager = () => {
       <Stack spacing={2} mb={3}>
         <WorkspaceHeading title="Produce inventory" description="Manage the produce, prices, and available stock restaurants see in Menurithm."
           actions={<Button variant="contained" startIcon={<WorkspaceIcon name="add" />} onClick={() => handleOpenDialog()}>Add listing</Button>} />
-        <Grid container spacing={2}>
-          {counts.map(({ label, items }) => <Grid key={label} size={{ xs: 4 }}>
-            <Card variant="outlined" sx={{ borderRadius: 3 }}><CardContent>
-              <Typography variant="h5" fontWeight={750}>{items.length}</Typography>
-              <Typography variant="body2" color="text.secondary">{label}</Typography>
-            </CardContent></Card>
-          </Grid>)}
-        </Grid>
-        {!!inventory.length && <Stack direction={{ xs: "column", sm: "row" }} gap={1.5}>
+        {!!inventory.length && <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} alignItems={{ sm: "center" }}>
           <TextField fullWidth size="small" label="Search listings" value={query} onChange={event => {
             setQuery((event.target as HTMLInputElement).value);
           }} />
           <TextField select size="small" label="Listing status" value={status} sx={{ minWidth: { sm: 220 } }}
             onChange={event => setStatus((event.target as HTMLInputElement).value)}>
-            <MenuItem value="all">All listings</MenuItem>
-            {counts.map(group => <MenuItem key={group.id} value={group.id}>{group.label}</MenuItem>)}
+            {counts.map(group => <MenuItem key={group.id} value={group.id}>{group.label} ({group.items.length})</MenuItem>)}
           </TextField>
+          <Typography role="status" variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
+            {visible.length} of {inventory.length} listings
+          </Typography>
         </Stack>}
       </Stack>
 
@@ -274,8 +314,9 @@ const ProduceInventoryManager = () => {
           {error}
         </Alert>
       )}
+      {notice && <Alert severity="success" role="status" sx={{ mb: 2 }} onClose={() => setNotice("")}>{notice}</Alert>}
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && (!error || inventory.length > 0) ? (
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent sx={{ textAlign: 'center', py: 4 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -284,90 +325,72 @@ const ProduceInventoryManager = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {inventory.length ? "Try another search or listing status." : "Add your first produce item to start selling."}
             </Typography>
-            <Button variant="outlined" onClick={() => inventory.length ? (setQuery(""), setStatus("all")) : handleOpenDialog()}>
+            <Button variant="outlined" onClick={() => {
+              if (inventory.length) { setQuery(""); setStatus("all"); }
+              else handleOpenDialog();
+            }}>
               {inventory.length ? "Clear filters" : "Add produce"}
             </Button>
           </CardContent>
         </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {visible.map((item) => (
-            <Grid size={{ xs: 12, md: 6, lg: 4 }} key={item.id}>
-              <Card variant="outlined" sx={{ height: "100%" }}>
-                <CardContent>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                    <Box flex={1}>
-                      <Typography variant="h6" gutterBottom>
-                        {item.produce_type}
-                        {item.variety && (
-                          <Typography component="span" variant="body2" color="text.secondary">
-                            {' '}({item.variety})
-                          </Typography>
-                        )}
-                      </Typography>
-                    </Box>
-                    <IconButton
-                      aria-label={`Listing actions for ${item.produce_type}`}
-                      aria-haspopup="menu"
-                      onClick={(e) => handleMenuOpen(e, item)}
-                    >
-                      <WorkspaceIcon name="more" />
-                    </IconButton>
+      ) : visible.length > 0 && (
+        <Card variant="outlined">
+          <Box aria-hidden="true" sx={{ display: { xs: "none", lg: "grid" }, gridTemplateColumns: stockColumns,
+            gap: 1.5, px: 2, py: 1.25, bgcolor: "background.default" }}>
+            {["Produce", "Available", "Committed", "On hand", "Status", "Actions"].map(label =>
+              <Typography key={label} variant="caption" fontWeight={700} color="text.secondary">{label}</Typography>)}
+          </Box>
+          <Box component="ul" aria-label="Produce listings" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            {visible.map(item => {
+              const art = illustrations.find(option => option.id === item.illustration_id);
+              const name = item.variety ? `${item.produce_type} (${item.variety})` : item.produce_type;
+              return <Box component="li" key={item.id} sx={{
+                display: "grid", gridTemplateColumns: { xs: "repeat(3, minmax(0, 1fr))", lg: stockColumns },
+                gap: 1.5, alignItems: "center", p: 2, "& + li": { borderTop: 1, borderColor: "divider" },
+              }}>
+                <Stack direction="row" gap={1.25} alignItems="center" minWidth={0} sx={{ gridColumn: { xs: "1 / -1", lg: "auto" } }}>
+                  <Box aria-hidden="true" sx={{ display: "grid", placeItems: "center", borderRadius: 2, width: 40,
+                    height: 40, flexShrink: 0, bgcolor: "background.default", color: "primary.main" }}>
+                    {art?.symbol ?? <WorkspaceIcon name="inventory" />}
                   </Box>
-
-                  <Box display="flex" gap={1} mb={1}>
-                    {item.organic && <Chip label="Organic" color="success" size="small" />}
-                    <Chip 
-                      label={!item.is_available ? "Paused" : item.quantity_available > 0 ? "Published" : "Sold out"}
-                      color={item.is_available && item.quantity_available > 0 ? "primary" : "default"}
-                      size="small" 
-                    />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Button aria-haspopup="dialog" onClick={() => setDetail(item)} sx={{ p: 0, minWidth: 0,
+                      textAlign: "left", justifyContent: "flex-start", color: "text.primary", overflowWrap: "anywhere" }}>{name}</Button>
+                    <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                      {money.format(item.price_per_unit)} / {item.unit}
+                    </Typography>
                   </Box>
-
-                  <Box component="dl" sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1,
-                    bgcolor: "background.default", borderRadius: 2, p: 1.25, my: 1.5 }}>
-                    {[
-                      ["Available", item.quantity_available],
-                      ["Committed", item.quantity_committed ?? 0],
-                      ["On hand", Number((item.quantity_available + (item.quantity_committed ?? 0)).toPrecision(12))],
-                    ].map(([label, quantity]) => <Box key={label}>
-                      <Typography component="dt" variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>{label}</Typography>
-                      <Typography component="dd" variant="body2" fontWeight={700} sx={{ m: 0, overflowWrap: "anywhere" }}>{quantity} {item.unit}</Typography>
-                    </Box>)}
-                  </Box>
-                  <Button variant="outlined" size="small" disabled={submitting} onClick={() => void updateStock(item)}>Update stock count</Button>
-                  <Button size="small" disabled={submitting} onClick={() => void toggleListing(item)}>
-                    {item.is_available ? 'Pause listing' : 'Publish listing'}
-                  </Button>
-                  <Typography variant="body2" gutterBottom>
-                    Price: ${item.price_per_unit}/{item.unit}
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    Location: {item.location}
-                  </Typography>
-                  
-                  {item.harvest_date && (
-                    <Typography variant="body2" color="text.secondary">
-                      Harvested: {formatDate(item.harvest_date)}
-                    </Typography>
-                  )}
-                  
-                  {item.expiry_date && (
-                    <Typography variant="body2" color="text.secondary">
-                      Expires: {formatDate(item.expiry_date)}
-                    </Typography>
-                  )}
-
-                  {item.description && (
-                    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                      {item.description}
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                </Stack>
+                {([
+                  ["Available", item.quantity_available],
+                  ["Committed", item.quantity_committed ?? 0],
+                  ["On hand", totalStock(item)],
+                ] as const).map(([label, quantity]) => <Box key={label}>
+                  <Typography variant="caption" color="text.secondary" sx={{
+                    overflowWrap: "anywhere",
+                    display: { xs: "block", lg: "inline" },
+                    position: { lg: "absolute" }, clipPath: { lg: "inset(50%)" },
+                  }}>{label}: </Typography>
+                  <Typography variant="body2" fontWeight={label === "Available" ? 750 : 500}
+                    sx={{ overflowWrap: "anywhere", fontVariantNumeric: "tabular-nums" }}>{quantity} {item.unit}</Typography>
+                </Box>)}
+                <Box sx={{ gridColumn: { xs: "1", lg: "auto" } }}>
+                  <Chip label={!item.is_available ? "Paused" : published(item) ? "Published" : "Sold out"}
+                    color={published(item) ? "primary" : "default"} size="small" />
+                </Box>
+                <Stack direction="row" gap={0.5} alignItems="center"
+                  sx={{ gridColumn: { xs: "2 / -1", lg: "auto" }, justifyContent: "flex-end" }}>
+                  <Button variant="outlined" size="small" aria-label={`Update stock for ${name}`} aria-haspopup="dialog"
+                    disabled={submitting} onClick={() => openStock(item)}>Update stock</Button>
+                  <IconButton aria-label={`Listing actions for ${name}`} aria-haspopup="menu"
+                    disabled={submitting} onClick={event => handleMenuOpen(event, item)}>
+                    <WorkspaceIcon name="more" />
+                  </IconButton>
+                </Stack>
+              </Box>;
+            })}
+          </Box>
+        </Card>
       )}
 
       {/* Context Menu */}
@@ -378,12 +401,18 @@ const ProduceInventoryManager = () => {
       >
         <MenuItem
           onClick={() => {
-            handleOpenDialog(selectedItem!);
+            if (selectedItem) handleOpenDialog(selectedItem);
             handleCloseMenu();
           }}
         >
           <Box sx={{ mr: 1, display: "flex" }}><WorkspaceIcon name="edit" /></Box>
           Edit
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (selectedItem) void toggleListing(selectedItem);
+          handleCloseMenu();
+        }}>
+          {selectedItem?.is_available ? "Pause listing" : "Publish listing"}
         </MenuItem>
         <MenuItem
           onClick={() => selectedItem && handleDelete(selectedItem)}
@@ -393,6 +422,45 @@ const ProduceInventoryManager = () => {
           Delete
         </MenuItem>
       </Menu>
+
+      <Dialog open={detail !== null} onClose={() => setDetail(null)} fullWidth maxWidth="xs" aria-labelledby="listing-details-title">
+        {detail && <>
+          <DialogTitle id="listing-details-title">{detail.produce_type}{detail.variety ? ` (${detail.variety})` : ""}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={1} sx={{ overflowWrap: "anywhere" }}>
+              <Typography>Location: {detail.location}</Typography>
+              {detail.organic && <Box><Chip label="Organic" color="success" size="small" /></Box>}
+              {detail.harvest_date && <Typography>Harvested: {formatDate(detail.harvest_date)}</Typography>}
+              {detail.expiry_date && <Typography>Expires: {formatDate(detail.expiry_date)}</Typography>}
+              {detail.description && <Typography sx={{ whiteSpace: "pre-wrap" }}>{detail.description}</Typography>}
+            </Stack>
+          </DialogContent>
+          <DialogActions><Button onClick={() => setDetail(null)}>Close</Button></DialogActions>
+        </>}
+      </Dialog>
+
+      <Dialog open={stockItem !== null} onClose={() => { if (!submitting) setStockItem(null); }}
+        fullWidth maxWidth="xs" aria-labelledby="update-stock-title">
+        {stockItem && <Box component="form" onSubmit={event => { event.preventDefault(); void updateStock(); }}>
+          <DialogTitle id="update-stock-title">Update stock: {stockItem.produce_type}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Typography color="text.secondary">
+                Currently available: {stockItem.quantity_available} {stockItem.unit}. Leave out the {stockItem.quantity_committed ?? 0} {stockItem.unit} already committed to orders.
+              </Typography>
+              {stockError && <Alert severity="error" action={<Button color="inherit" size="small" disabled={submitting}
+                onClick={() => void reloadStock()}>Reload stock</Button>}>{stockError}</Alert>}
+              <TextField autoFocus required label={`New available stock (${stockItem.unit})`} type="number" value={stockDraft}
+                disabled={submitting} slotProps={{ htmlInput: { min: 0, step: "any" } }}
+                onChange={event => setStockDraft((event.target as HTMLInputElement).value)} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button disabled={submitting} onClick={() => setStockItem(null)}>Cancel</Button>
+            <Button variant="contained" type="submit" disabled={submitting}>{submitting ? "Saving…" : "Save stock"}</Button>
+          </DialogActions>
+        </Box>}
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
