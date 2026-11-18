@@ -20,17 +20,31 @@ All routes below are rooted at `/api/fulfillment`.
 | --- | --- | --- |
 | POST | `/orders` | Customer: create request with method `customer_pickup` or `farmer_delivery`, quantity/unit, customer name, timezone-aware window start/end, optional requirements, delivery address when delivering |
 | GET | `/orders` | Customer's own orders and current agreement terms only |
-| POST | `/orders/{id}/accept` | Customer: `{"revision": 1}` accepts exact quote; stale revision returns 409 |
+| GET | `/produce/available` | Authenticated Menurithm bridge: current available listings with farmer, quantity, unit, price and location; optional `produce_type`, `location` and `max_price` filters |
+| POST | `/orders/{id}/accept` | Customer: `{"revision": 1}` accepts the exact quote and reserves available stock; stale revisions or insufficient stock return 409 |
+| POST | `/orders/{id}/cancel` | Customer: cancel own order before handover and release any reservation |
 | GET | `/farmer/orders` | Farmer: unassigned and own orders |
-| PUT | `/farmer/orders/{id}/quote` | Farmer: method, decimal-string `fee`, `currency: "USD"`, pickup address, instructions, `expected_revision` |
+| PUT | `/farmer/orders/{id}/quote` | Farmer: method, decimal-string `produce_total` and `fee`, `currency: "USD"`, pickup address, instructions, `expected_revision`; set `produce_inventory_id` if not already linked |
 | PUT | `/farmer/orders/{id}/stage` | Assigned farmer: `{"stage": "ready"}`, then `collected` for pickup or `delivered` for delivery |
+| POST | `/farmer/orders/{id}/cancel` | Assigned farmer: cancel before handover and release any reservation |
+| POST | `/farmer/orders/{id}/record-payment` | Assigned farmer: record direct payment after handover of a priced order; does not collect money |
 
 `id` in these routes is the **agreement ID**, not `request_id`. Both are
 returned. Terms include `revision`, `accepted_revision`, `accepted_at`,
-farmer/customer contact, fee as a decimal string, method and handover stage.
-No produce price or payment collection is implied by a delivery quote.
+farmer/customer contact, `fee`, `produce_total`, `sale_total` (decimal strings
+when set), `stock_reserved`, `payment_recorded_at`, method and handover stage.
 Fees reject negatives, non-finite values and more than two decimal places.
 Pickup requires an address and zero fee. Accepted terms cannot be edited.
+Menurithm may include `produce_inventory_id` and its own
+`menurithm_inventory_item_id` when creating a request. Selecting a listing does
+not reserve it. Acceptance reserves stock once and handover consumes that
+reservation without a second deduction. Menurithm adds produce to kitchen stock only after the restaurant
+confirms the actual received quantity.
+
+Farmer `GET /api/produce/inventory` returns `quantity_available` (uncommitted
+stock) and `quantity_committed`; their sum represents on-hand stock. A
+`PUT /api/produce/inventory/{id}` that sets `quantity_available` must include
+the previously read `expected_quantity_available`. A stale count returns 409.
 
 Native customers use Croprithm restaurant Firebase tokens. Menurithm's backend
 uses `Authorization: Bearer <FULFILLMENT_BRIDGE_KEY>` with a server-derived

@@ -12,9 +12,14 @@ const order = {
   delivery_address: '', pickup_address: null, instructions: null, revision: 0, stage: 'requested',
   window_start: '2026-11-01T10:00:00Z', window_end: '2026-11-01T12:00:00Z',
   customer_contact: 'fixture@example.com', special_requirements: 'Keep shaded.',
+  produce_inventory_id: null, produce_total: null, sale_total: null, seller_id: null,
 };
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
+  if (String(input).endsWith('/api/produce/inventory')) return Response.json([{
+    id: 1, produce_type: 'Tomatoes', quantity_available: 20, quantity_committed: 0,
+    unit: 'kg', price_per_unit: 3, location: 'Fixture farm', is_available: true,
+  }]);
   if (!String(input).includes('/api/fulfillment/')) return originalFetch(input, init);
   if (init?.method === 'PUT') {
     const body = JSON.parse(String(init.body));

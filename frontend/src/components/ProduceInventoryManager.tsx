@@ -131,8 +131,12 @@ const ProduceInventoryManager = () => {
       };
 
       if (editingItem) {
-        // Updates can include is_available
-        await produceInventoryApi.update(editingItem.id, { ...baseData, is_available: formData.is_available });
+        const { quantity_available, ...details } = baseData;
+        await produceInventoryApi.update(editingItem.id, {
+          ...details, is_available: formData.is_available,
+          ...(quantity_available !== editingItem.quantity_available
+            ? { quantity_available, expected_quantity_available: editingItem.quantity_available } : {}),
+        });
       } else {
         // Create does not accept is_available per backend schema
         await produceInventoryApi.create(baseData);
@@ -142,7 +146,7 @@ const ProduceInventoryManager = () => {
       handleCloseDialog();
     } catch (err) {
       console.error('Failed to save inventory item:', err);
-      setError('Failed to save inventory item. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to save inventory item.');
     } finally {
       setSubmitting(false);
     }
@@ -156,9 +160,39 @@ const ProduceInventoryManager = () => {
         handleCloseMenu();
       } catch (err) {
         console.error('Failed to delete inventory item:', err);
-        setError('Failed to delete inventory item. Please try again.');
+        setError(err instanceof Error ? err.message : 'Failed to delete inventory item.');
       }
     }
+  };
+
+  const updateStock = async (item: ProduceInventory) => {
+    const entered = window.prompt(`New available count (${item.unit}), excluding ${item.quantity_committed ?? 0} already committed:`, String(item.quantity_available));
+    if (entered === null) return;
+    const quantity = Number(entered);
+    if (!entered.trim() || !Number.isFinite(quantity) || quantity < 0) {
+      setError('Enter an available quantity of zero or more.');
+      return;
+    }
+    setSubmitting(true); setError('');
+    try {
+      await produceInventoryApi.update(item.id, {
+        quantity_available: quantity, expected_quantity_available: item.quantity_available,
+      });
+      await loadInventory();
+    } catch (err) {
+      await loadInventory();
+      setError(err instanceof Error ? err.message : 'Failed to update stock.');
+    } finally { setSubmitting(false); }
+  };
+
+  const toggleListing = async (item: ProduceInventory) => {
+    setSubmitting(true); setError('');
+    try {
+      await produceInventoryApi.update(item.id, { is_available: !item.is_available });
+      await loadInventory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change listing visibility.');
+    } finally { setSubmitting(false); }
   };
 
   const handleMenuOpen = (event: Event, item: ProduceInventory) => {
@@ -244,15 +278,20 @@ const ProduceInventoryManager = () => {
                   <Box display="flex" gap={1} mb={1}>
                     {item.organic && <Chip label="Organic" color="success" size="small" />}
                     <Chip 
-                      label={item.is_available ? "Available" : "Unavailable"} 
-                      color={item.is_available ? "primary" : "default"} 
+                      label={!item.is_available ? "Paused" : item.quantity_available > 0 ? "Published" : "Sold out"}
+                      color={item.is_available && item.quantity_available > 0 ? "primary" : "default"}
                       size="small" 
                     />
                   </Box>
 
                   <Typography variant="body2" gutterBottom>
-                    Quantity: {item.quantity_available} {item.unit}
+                    Available: {item.quantity_available} {item.unit} · Committed: {item.quantity_committed ?? 0} {item.unit}
                   </Typography>
+                  <Typography variant="body2">On hand: {Number((item.quantity_available + (item.quantity_committed ?? 0)).toPrecision(12))} {item.unit}</Typography>
+                  <Button size="small" disabled={submitting} onClick={() => void updateStock(item)}>Update stock count</Button>
+                  <Button size="small" disabled={submitting} onClick={() => void toggleListing(item)}>
+                    {item.is_available ? 'Pause listing' : 'Publish listing'}
+                  </Button>
                   <Typography variant="body2" gutterBottom>
                     Price: ${item.price_per_unit}/{item.unit}
                   </Typography>

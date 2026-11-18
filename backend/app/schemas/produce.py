@@ -6,9 +6,9 @@ from datetime import datetime
 class ProduceInventoryCreate(BaseModel):
     produce_type: str
     variety: Optional[str] = None
-    quantity_available: float
+    quantity_available: float = Field(ge=0, allow_inf_nan=False)
     unit: str
-    price_per_unit: float
+    price_per_unit: float = Field(ge=0, allow_inf_nan=False)
     harvest_date: Optional[datetime] = None
     expiry_date: Optional[datetime] = None
     location: str
@@ -20,9 +20,10 @@ class ProduceInventoryCreate(BaseModel):
 class ProduceInventoryUpdate(BaseModel):
     produce_type: Optional[str] = None
     variety: Optional[str] = None
-    quantity_available: Optional[float] = None
+    quantity_available: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    expected_quantity_available: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     unit: Optional[str] = None
-    price_per_unit: Optional[float] = None
+    price_per_unit: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     harvest_date: Optional[datetime] = None
     expiry_date: Optional[datetime] = None
     location: Optional[str] = None
@@ -38,6 +39,7 @@ class ProduceInventoryResponse(BaseModel):
     produce_type: str
     variety: Optional[str]
     quantity_available: float
+    quantity_committed: float = 0
     unit: str
     price_per_unit: float
     harvest_date: Optional[datetime]
@@ -50,6 +52,8 @@ class ProduceInventoryResponse(BaseModel):
     is_available: bool
     created_at: datetime
     updated_at: datetime
+    seller_name: Optional[str] = None
+    seller_contact: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

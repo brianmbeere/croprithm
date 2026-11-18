@@ -355,7 +355,7 @@ async def update_stop_handover(
     if agreement.method != "farmer_delivery":
         raise HTTPException(409, "Pickup orders cannot be completed from a delivery route")
     order = db.query(ProduceRequest).filter(ProduceRequest.id == stop.request_id).with_for_update().one()
-    advance_handover(agreement, order, updates.stage, seller.id)
+    advance_handover(db, agreement, order, updates.stage, seller.id)
     if route.status == "planned":
         route.status = "active"
     if updates.stage == "delivered":

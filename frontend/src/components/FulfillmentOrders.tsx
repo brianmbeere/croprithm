@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { auth } from '../hooks/initializeFirebase';
 import { BASE_URL } from '../utils';
+import { produceInventoryApi, type ProduceInventory } from '../api/produceApi';
 
 interface Order {
   id: number; request_id: number; restaurant_name: string; produce_type: string;
@@ -13,8 +14,13 @@ interface Order {
   delivery_address: string; window_start: string; window_end: string;
   revision: number; stage: string;
   customer_contact: string | null; special_requirements: string | null;
+  produce_inventory_id: number | null; produce_total: string | null; sale_total: string | null;
+  stock_reserved: boolean; payment_recorded_at: string | null; seller_id: number | null;
 }
-interface Quote { method: string; fee: string; pickup_address: string; instructions: string }
+interface Quote {
+  method: string; fee: string; pickup_address: string; instructions: string;
+  produce_total: string; produce_inventory_id: number | '';
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const user = auth.currentUser;
@@ -29,6 +35,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export default function FulfillmentOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [inventory, setInventory] = useState<ProduceInventory[]>([]);
   const [drafts, setDrafts] = useState<Record<number, Quote>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -37,12 +44,21 @@ export default function FulfillmentOrders() {
   const refresh = async () => {
     setLoading(true); setError('');
     try {
-      const data = await request<Order[]>('farmer/orders');
+      const [data, stock] = await Promise.all([
+        request<Order[]>('farmer/orders'), produceInventoryApi.getSellerInventory(),
+      ]);
       setOrders(data);
-      setDrafts(Object.fromEntries(data.map(order => [order.id, {
+      setInventory(stock);
+      setDrafts(Object.fromEntries(data.map(order => {
+        const listing = stock.find(item => item.id === order.produce_inventory_id);
+        return [order.id, {
         method: order.method, fee: order.fee || '0.00',
         pickup_address: order.pickup_address || '', instructions: order.instructions || '',
-      }])));
+        produce_inventory_id: order.produce_inventory_id ?? '',
+        produce_total: order.produce_total ?? (listing
+          ? (listing.price_per_unit * order.quantity_needed).toFixed(2) : ''),
+        }];
+      })));
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not load orders'); }
     finally { setLoading(false); }
   };
@@ -64,6 +80,20 @@ export default function FulfillmentOrders() {
   const change = (id: number, key: keyof Quote, value: string) =>
     setDrafts(previous => ({ ...previous, [id]: { ...previous[id], [key]: value } }));
 
+  const closeOrder = async (order: Order, action: 'cancel' | 'record-payment') => {
+    if (!window.confirm(action === 'cancel'
+      ? 'Cancel this order and release any reserved stock?'
+      : `Confirm you received USD ${order.sale_total} directly from the customer?`)) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const updated = await request<Order>(`farmer/orders/${order.id}/${action}`, { method: 'POST' });
+      setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
+      setNotice(action === 'cancel' ? 'Order canceled. Any reserved stock was released.' : 'Direct payment recorded.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update the order.');
+    } finally { setBusy(false); }
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -71,7 +101,7 @@ export default function FulfillmentOrders() {
         <Typography variant="h4">Orders & handovers</Typography>
         <Typography color="text.secondary">Your produce. Your standards. Offer customer pickup or deliver it yourself.</Typography>
       </Box>
-      <Alert severity="info">Quote your delivery fee in USD. The customer must accept the exact terms before you proceed. Agree produce pricing and collect payment separately; the app does not process payments or assign third-party drivers.</Alert>
+      <Alert severity="info">Quote produce and delivery in USD. Stock is reserved when the customer accepts. Collect payment directly, then record it here after handover. Croprithm does not process payments.</Alert>
       {error && <Alert severity="error" role="alert">{error}</Alert>}
       {notice && <Alert severity="success" role="status">{notice}</Alert>}
       <Box><Button variant="outlined" disabled={loading || busy} onClick={refresh}>Refresh orders</Button></Box>
@@ -80,6 +110,10 @@ export default function FulfillmentOrders() {
       {orders.map(order => {
         const draft = drafts[order.id];
         const canQuote = ['requested', 'quoted'].includes(order.stage);
+        const completed = ['collected', 'delivered'].includes(order.stage);
+        const matchingStock = inventory.filter(item => item.is_available && item.quantity_available >= order.quantity_needed
+          && item.produce_type.trim().toLowerCase() === order.produce_type.trim().toLowerCase()
+          && item.unit.trim().toLowerCase() === order.unit.trim().toLowerCase());
         return <Card key={order.id}><CardContent>
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" gap={1} flexWrap="wrap">
@@ -94,6 +128,23 @@ export default function FulfillmentOrders() {
             {canQuote && draft ? (
               <Box component="form" onSubmit={event => { event.preventDefault(); void save(order, 'quote'); }}
                 sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                {!order.produce_inventory_id && <TextField select required label="Stock listing"
+                  value={draft.produce_inventory_id}
+                  helperText={matchingStock.length ? 'Select the stock that will fulfill this request.' : 'Add enough matching stock in My Inventory first.'}
+                  onChange={event => {
+                    const listing = matchingStock.find(item => item.id === Number((event.target as HTMLInputElement).value));
+                    if (listing) setDrafts(previous => ({ ...previous, [order.id]: {
+                      ...previous[order.id], produce_inventory_id: listing.id,
+                      produce_total: (listing.price_per_unit * order.quantity_needed).toFixed(2),
+                    } }));
+                  }}>
+                  {matchingStock.map(item => <MenuItem key={item.id} value={item.id}>
+                    {item.produce_type} {item.variety || ''} · {item.location} · {item.quantity_available} {item.unit}
+                  </MenuItem>)}
+                </TextField>}
+                <TextField required label="Produce subtotal (USD)" type="number" value={draft.produce_total}
+                  slotProps={{ htmlInput: { min: 0, step: '0.01', max: '99999999.99' } }}
+                  onChange={event => change(order.id, 'produce_total', (event.target as HTMLInputElement).value)} />
                 <TextField select label="Fulfillment you can offer" value={draft.method}
                   onChange={event => change(order.id, 'method', (event.target as HTMLInputElement).value)}>
                   <MenuItem value="customer_pickup">Customer pickup</MenuItem>
@@ -109,11 +160,11 @@ export default function FulfillmentOrders() {
                   value={draft.instructions} onChange={event => change(order.id, 'instructions', (event.target as HTMLInputElement).value)} />
                 <Stack justifyContent="end" alignItems="flex-start" spacing={1}>
                   {draft.method === 'customer_pickup' && <Typography variant="body2">Pickup delivery fee: USD 0.00</Typography>}
-                  <Button type="submit" variant="contained" disabled={busy}>Send {order.revision ? 'revised ' : ''}quote for approval</Button>
+                  <Button type="submit" variant="contained" disabled={busy || !draft.produce_inventory_id}>Send {order.revision ? 'revised ' : ''}quote for approval</Button>
                 </Stack>
               </Box>
             ) : <>
-              <Typography fontWeight={650}>{order.method === 'customer_pickup' ? 'Customer pickup' : 'Farmer delivery'} · USD {order.fee} delivery fee · accepted quote {order.revision}</Typography>
+              {order.stage !== 'canceled' && <Typography fontWeight={650}>{order.method === 'customer_pickup' ? 'Customer pickup' : 'Farmer delivery'} · USD {order.fee} delivery fee · accepted quote {order.revision}</Typography>}
               {order.pickup_address && <Typography sx={{ overflowWrap: 'anywhere' }}>Pickup: {order.pickup_address}</Typography>}
               <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{order.instructions}</Typography>
               {order.stage === 'accepted' && <Button sx={{ alignSelf: 'flex-start' }} variant="contained" disabled={busy}
@@ -123,6 +174,13 @@ export default function FulfillmentOrders() {
                 {order.method === 'customer_pickup' ? 'Confirm customer collected produce' : 'Confirm delivered to customer'}
               </Button>}
             </>}
+            {order.sale_total != null && <Typography>Produce: USD {order.produce_total} · Delivery: USD {order.fee} · Total: USD {order.sale_total}</Typography>}
+            {order.stock_reserved && <Chip sx={{ alignSelf: 'flex-start' }} label="Stock committed" color="success" />}
+            {order.payment_recorded_at && <Alert severity="success">Direct payment recorded {new Date(order.payment_recorded_at).toLocaleString()}.</Alert>}
+            {completed && order.sale_total != null && !order.payment_recorded_at && <Button sx={{ alignSelf: 'flex-start' }}
+              variant="contained" disabled={busy} onClick={() => void closeOrder(order, 'record-payment')}>Record direct payment</Button>}
+            {order.seller_id && !completed && order.stage !== 'canceled' && <Button sx={{ alignSelf: 'flex-start' }}
+              color="error" disabled={busy} onClick={() => void closeOrder(order, 'cancel')}>Cancel order</Button>}
           </Stack>
         </CardContent></Card>;
       })}

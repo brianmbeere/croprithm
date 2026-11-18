@@ -9,17 +9,21 @@ New orders use **customer pickup** or **farmer delivery**, not third-party
 dispatch. Customers create requests in Menurithm's **Produce orders** workspace
 (also accessible from inventory and service integrations). Farmers quote them
 in Croprithm's **Orders & handovers**. Farmers choose the method they can offer,
-provide handover instructions and a USD delivery fee. Pickup requires a pickup
+provide handover instructions, a USD produce subtotal and a delivery fee. Pickup requires a pickup
 address and a zero delivery fee. Delivery requires the customer's address.
 The customer's requested timezone-aware window is retained in the agreement.
 
 The customer reviews the farmer contact, method, location, instructions, window
-and delivery fee, checks an explicit agreement box and accepts that quote
+and total price, checks an explicit agreement box and accepts that quote
 revision. Revised unaccepted quotes require fresh acceptance; stale revisions
 are rejected. Accepted terms are locked against further editing.
-This agrees **delivery terms only**: produce pricing, availability and all
-payments must be arranged directly. No payment is collected in either app.
-Inventory is still managed manually; a request does not reserve or deduct stock.
+Requests and quotes do not hold stock. Accepting a new quote moves the order's
+quantity from available to committed. Either party can cancel before handover
+to release it. Handover removes the commitment without deducting available
+stock again. In **My Inventory**, farmers can see available, committed and
+on-hand stock and update the available count without editing listing details.
+Customers pay farmers directly. After handover, the assigned farmer can record
+that payment was received; neither app collects money or handles refunds.
 
 Stages: requested → quoted → accepted → ready → collected (pickup) or delivered
 (farmer delivery). Only the assigned farmer can record handover.
@@ -28,20 +32,23 @@ dependency between the apps. Farmer confirmation is not customer proof of receip
 
 New pickup orders and unapproved delivery quotes cannot enter delivery routes.
 Historical requests remain in **Legacy requests** with their original behavior.
-Existing routes and database rows are not reinterpreted or migrated.
+Existing orders are not retroactively reserved or priced. A pre-existing
+accepted order linked to a listing still deducts at handover if not already
+reserved. Historical unlinked handovers do not affect stock. Completed
+historical orders are not reconciled automatically.
 From a saved itinerary in **Route Planner** or **Saved Routes > View Details**,
 use **Mark produce ready**, then **Confirm delivered to customer** after the
 physical handover. Explicit confirmation atomically updates the agreement,
 customer order and route stop, just like the action in **Orders & handovers**.
 Ordinary route progress and legacy **Mark delivered** do not confirm an order.
-This follow-up requires no database migration.
 
 ### Backend setup and deployment order
 
 1. Back up the Croprithm logical database (internally named `routecast`).
 2. From `backend`, with its own `DATABASE_URL` / `DB_NAME`, run
-   `python migrate_fulfillment.py`. This idempotently creates only the new
-   `fulfillment_agreements` table; it does not modify existing order columns
+   `python migrate_fulfillment.py`. This idempotently creates or adds the
+   fulfillment agreement fields for listing and kitchen links, pricing,
+   reservations and payment records; it does not modify existing order columns
    or the Menurithm logical database. `create_all` is not a column migration.
 3. Generate a strong random `FULFILLMENT_BRIDGE_KEY`. Set the **same value only
    on both API services**, never in a `VITE_*` variable, Git or browser storage.
@@ -51,16 +58,17 @@ This follow-up requires no database migration.
    The bridge uses the origin of `CROPRITHM_BASE_URL` with `/api/fulfillment`;
    legacy `/api/v1` suffixes are not appended. An unconfigured bridge returns 503,
    never a pretend demo order. Keep bounded database pools unchanged.
-5. Rollback: revert application deployment, retaining the additive table and its
-   agreements. Do not drop pilot order data. Legacy status APIs reject agreement
-   orders to prevent bypassing customer approval.
+5. Once the pilot accepts reservations, do not roll back to a build that
+   ignores them: it could deduct stock again at handover. Pause fulfillment
+   writes and reconcile outstanding commitments before such a rollback. Retain
+   the additive table and existing order data.
 
 Run `python -m unittest test_fulfillment test_delivery_workflow test_database_config -q`
 from the backend. The dev-only `/tests/fulfillment.html` frontend fixture checks
 farmer quoting without credentials or real orders; the Menurithm counterpart
 checks customer request/approval and responsive navigation. Neither is bundled.
-Physical-device validation remains open in issue 22. Cancellation/reassignment,
-stock reservations, produce checkout, notifications and dedicated driver
+Physical-device validation remains open in issue 22. Reassignment,
+online checkout, notifications and dedicated driver
 operations are future work in issue 28.
 
 ## Mobile-web delivery pilot

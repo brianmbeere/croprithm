@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 from app.db.database import get_db
-from app.models.produce import ProduceInventory
+from app.models.produce import ProduceInventory, ProduceRequest
+from app.models.fulfillment import FulfillmentAgreement
 from app.models.user import User
 from app.schemas.produce import (
     ProduceInventoryCreate, 
@@ -13,6 +15,21 @@ from app.utils.auth_dependency import verify_firebase_token
 from app.services.menurithm_api import menurithm_client
 
 router = APIRouter(prefix="/api/produce", tags=["produce"])
+
+
+def inventory_with_commitments(db: Session):
+    committed = db.query(func.coalesce(func.sum(ProduceRequest.quantity_needed), 0)).select_from(
+        FulfillmentAgreement
+    ).join(ProduceRequest, ProduceRequest.id == FulfillmentAgreement.request_id).filter(
+        FulfillmentAgreement.stock_reserved.is_(True),
+        FulfillmentAgreement.produce_inventory_id == ProduceInventory.id,
+    ).correlate(ProduceInventory).scalar_subquery()
+    return db.query(ProduceInventory, committed)
+
+
+def inventory_response(item: ProduceInventory, committed: float):
+    return ProduceInventoryResponse.model_validate(item).model_copy(update={"quantity_committed": committed})
+
 
 @router.post("/inventory", response_model=ProduceInventoryResponse)
 async def create_produce_inventory(
@@ -48,10 +65,10 @@ async def get_seller_inventory(
     if not seller:
         raise HTTPException(status_code=404, detail="User not found")
 
-    inventory = db.query(ProduceInventory).filter(
+    inventory = inventory_with_commitments(db).filter(
         ProduceInventory.seller_id == seller.id
     ).all()
-    return inventory
+    return [inventory_response(item, committed) for item, committed in inventory]
 
 @router.put("/inventory/{inventory_id}", response_model=ProduceInventoryResponse)
 async def update_produce_inventory(
@@ -68,18 +85,32 @@ async def update_produce_inventory(
     inventory = db.query(ProduceInventory).filter(
         ProduceInventory.id == inventory_id,
         ProduceInventory.seller_id == seller.id
-    ).first()
+    ).with_for_update().first()
     
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
     # Update only provided fields
-    for field, value in updates.model_dump(exclude_unset=True).items():
+    fields = updates.model_dump(exclude_unset=True, exclude={"expected_quantity_available"})
+    for field in {"quantity_available", "price_per_unit", "unit", "produce_type", "location", "is_available"} & fields.keys():
+        if fields[field] is None or (isinstance(fields[field], str) and not fields[field].strip()):
+            raise HTTPException(422, f"{field} cannot be blank.")
+    if "quantity_available" in fields and updates.expected_quantity_available != inventory.quantity_available:
+        raise HTTPException(409, "Stock changed or the previous count is missing. Refresh inventory and retry.")
+    if any(field in fields and fields[field] != getattr(inventory, field) for field in ("unit", "produce_type")):
+        if db.query(FulfillmentAgreement.id).filter(
+            FulfillmentAgreement.produce_inventory_id == inventory.id,
+            FulfillmentAgreement.stage.in_(["requested", "quoted", "accepted", "ready"]),
+        ).first():
+            raise HTTPException(409, "Cannot change the crop or unit while orders reference this listing.")
+    for field, value in fields.items():
         setattr(inventory, field, value)
 
+    db.flush()
+    item, committed = inventory_with_commitments(db).filter(ProduceInventory.id == inventory_id).one()
+    response = inventory_response(item, committed)
     db.commit()
-    db.refresh(inventory)
-    return inventory
+    return response
 
 @router.delete("/inventory/{inventory_id}")
 async def delete_produce_inventory(
@@ -95,11 +126,13 @@ async def delete_produce_inventory(
     inventory = db.query(ProduceInventory).filter(
         ProduceInventory.id == inventory_id,
         ProduceInventory.seller_id == seller.id
-    ).first()
+    ).with_for_update().first()
     
     if not inventory:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
+    if db.query(FulfillmentAgreement.id).filter_by(produce_inventory_id=inventory.id).first():
+        raise HTTPException(409, "This listing has order history. Pause it instead of deleting it.")
     db.delete(inventory)
     db.commit()
     return {"message": "Inventory item deleted successfully"}
@@ -118,7 +151,7 @@ async def get_available_produce(
     query = db.query(ProduceInventory).filter(
         ProduceInventory.is_available == True,
         ProduceInventory.quantity_available > 0
-    )
+    ).options(joinedload(ProduceInventory.seller))
 
     if produce_type:
         query = query.filter(ProduceInventory.produce_type.ilike(f"%{produce_type}%"))
@@ -132,7 +165,15 @@ async def get_available_produce(
     if max_price:
         query = query.filter(ProduceInventory.price_per_unit <= max_price)
 
-    return query.offset(skip).limit(limit).all()
+    listings = query.offset(skip).limit(limit).all()
+    return [
+        {
+            **ProduceInventoryResponse.model_validate(listing).model_dump(),
+            "seller_name": listing.seller.full_name,
+            "seller_contact": listing.seller.email,
+        }
+        for listing in listings
+    ]
 
 @router.get("/search", response_model=List[ProduceInventoryResponse])
 async def search_produce(

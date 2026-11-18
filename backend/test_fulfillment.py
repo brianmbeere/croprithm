@@ -14,11 +14,11 @@ os.environ.setdefault("MENURITHM_API_KEY", "test-only")
 
 from app.db.database import Base, get_db
 from app.models.user import User
-from app.models.produce import ProduceRequest, DeliveryRoute, DeliveryStop
+from app.models.produce import ProduceInventory, ProduceRequest, DeliveryRoute, DeliveryStop
 from app.models.fulfillment import FulfillmentAgreement
 from app.models.route import OptimizedStop, RouteResponse
 with patch("firebase_admin.credentials.Certificate"), patch("firebase_admin.initialize_app"):
-    from app.routes import fulfillment, delivery, requests, user
+    from app.routes import fulfillment, delivery, produce, requests, user
 from app.utils.auth_dependency import verify_firebase_token
 
 
@@ -28,7 +28,7 @@ class FulfillmentTests(unittest.TestCase):
         Base.metadata.create_all(self.engine)
         self.sessions = sessionmaker(bind=self.engine)
         app = FastAPI()
-        for router in [fulfillment.router, delivery.router, requests.router, user.router]:
+        for router in [fulfillment.router, delivery.router, produce.router, requests.router, user.router]:
             app.include_router(router)
         self.identity = "menurithm:customer-one"
         self.uid = "farmer"
@@ -46,6 +46,9 @@ class FulfillmentTests(unittest.TestCase):
             for index, uid in enumerate(["farmer", "other"], 1):
                 db.add(User(id=index, firebase_uid=uid, email=f"{uid}@example.com", full_name=uid,
                             organization="Farm", country="United States", role="farmer"))
+            db.add(ProduceInventory(id=10, seller_id=1, produce_type="Tomato", unit="kg",
+                                    quantity_available=10, price_per_unit=3.5, location="Farm",
+                                    is_available=True))
             db.commit()
         self.payload = {
             "restaurant_name": "Kitchen", "produce_type": "Tomato", "quantity_needed": 3,
@@ -66,6 +69,7 @@ class FulfillmentTests(unittest.TestCase):
     def quote(self, order, **updates):
         return self.client.put(f"/api/fulfillment/farmer/orders/{order['id']}/quote", json={
             "method": order["method"], "fee": "6.25", "instructions": "Call on arrival; keep shaded",
+            "produce_total": "10.50", "produce_inventory_id": order["produce_inventory_id"] or 10,
             "expected_revision": order["revision"], **updates,
         })
 
@@ -130,6 +134,120 @@ class FulfillmentTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/fulfillment/farmer/orders").json(), [])
         self.assertEqual(self.quote({**order, "revision": 1}).status_code, 403)
         self.assertEqual(self.stage(order, "ready").status_code, 403)
+
+    def test_selected_listing_reserves_at_acceptance_and_consumes_at_handover(self):
+        with self.sessions() as db:
+            db.add(ProduceInventory(
+                id=20, seller_id=1, produce_type="Tomato", variety="Roma",
+                quantity_available=10, unit="kg", price_per_unit=3.5,
+                location="Farm A", organic=True, is_available=True,
+            ))
+            db.commit()
+
+        catalog = self.client.get("/api/fulfillment/produce/available")
+        self.assertEqual(catalog.status_code, 200, catalog.text)
+        listing = next(item for item in catalog.json() if item["id"] == 20)
+        self.assertEqual(listing["seller_name"], "farmer")
+        self.assertEqual(listing["price_per_unit"], 3.5)
+
+        order = self.create(produce_inventory_id=20, menurithm_inventory_item_id=8)
+        self.assertEqual(order["seller_id"], 1)
+        self.assertEqual(order["produce_inventory_id"], 20)
+        self.assertEqual(order["menurithm_inventory_item_id"], 8)
+        self.quote(order)
+        self.assertEqual(self.accept(order).status_code, 200)
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceInventory, 20).quantity_available, 7)
+            self.assertTrue(db.get(FulfillmentAgreement, order["id"]).stock_reserved)
+        self.assertEqual(self.stage(order, "ready").status_code, 200)
+        self.assertEqual(self.stage(order, "delivered").status_code, 200)
+        self.assertEqual(self.stage(order, "delivered").status_code, 200)
+
+        with self.sessions() as db:
+            listing = db.get(ProduceInventory, 20)
+            self.assertEqual(listing.quantity_available, 7)
+            self.assertFalse(db.get(FulfillmentAgreement, order["id"]).stock_reserved)
+
+    def test_orders_compete_for_available_stock_and_cancel_releases_once(self):
+        first = self.create(quantity_needed=7)
+        second = self.create(quantity_needed=7)
+        for order in (first, second):
+            self.assertEqual(self.quote(order).status_code, 200)
+        for _ in range(2):
+            accepted = self.accept(first)
+            self.assertEqual(accepted.status_code, 200, accepted.text)
+            self.assertTrue(accepted.json()["stock_reserved"])
+            self.assertEqual(accepted.json()["sale_total"], "16.75")
+        self.assertEqual(self.accept(second).status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 3)
+        for _ in range(2):
+            canceled = self.client.post(f"/api/fulfillment/orders/{first['id']}/cancel")
+            self.assertEqual(canceled.status_code, 200, canceled.text)
+            self.assertFalse(canceled.json()["stock_reserved"])
+        self.assertEqual(self.accept(first).status_code, 409)
+        self.assertEqual(self.accept(second).status_code, 200)
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 3)
+
+    def test_only_fulfilling_farmer_can_record_payment_after_handover(self):
+        order = self.create()
+        self.assertEqual(self.quote(order).status_code, 200)
+        self.assertEqual(self.accept(order).status_code, 200)
+        endpoint = f"/api/fulfillment/farmer/orders/{order['id']}/record-payment"
+        self.assertEqual(self.client.post(endpoint).status_code, 409)
+        self.assertEqual(self.stage(order, "ready").status_code, 200)
+        self.assertEqual(self.stage(order, "delivered").status_code, 200)
+        self.uid = "other"
+        self.assertEqual(self.client.post(endpoint).status_code, 404)
+        self.uid = "farmer"
+        recorded = self.client.post(endpoint)
+        self.assertEqual(recorded.status_code, 200, recorded.text)
+        self.assertIsNotNone(recorded.json()["payment_recorded_at"])
+        self.assertEqual(self.client.post(endpoint).json(), recorded.json())
+
+    def test_inventory_counts_and_edits_respect_commitments(self):
+        order = self.create(quantity_needed=10)
+        self.assertEqual(self.quote(order).status_code, 200)
+        self.assertEqual(self.accept(order).status_code, 200)
+        endpoint = "/api/produce/inventory/10"
+        item = self.client.get("/api/produce/inventory").json()[0]
+        self.assertEqual((item["quantity_available"], item["quantity_committed"]), (0, 10))
+        self.assertEqual(self.client.get("/api/fulfillment/produce/available").json(), [])
+        self.assertEqual(self.client.put(endpoint, json={
+            "quantity_available": 12, "expected_quantity_available": 10,
+        }).status_code, 409)
+        self.assertEqual(self.client.put(endpoint, json={"unit": "lb"}).status_code, 409)
+        self.assertEqual(self.client.delete(endpoint).status_code, 409)
+        item = self.client.put(endpoint, json={
+            "quantity_available": 2, "expected_quantity_available": 0, "is_available": False,
+        }).json()
+        self.assertEqual((item["quantity_available"], item["quantity_committed"]), (2, 10))
+        canceled = self.client.post(f"/api/fulfillment/farmer/orders/{order['id']}/cancel")
+        self.assertEqual(canceled.status_code, 200, canceled.text)
+        item = self.client.get("/api/produce/inventory").json()[0]
+        self.assertEqual((item["quantity_available"], item["quantity_committed"]), (12, 0))
+        self.assertFalse(item["is_available"])
+
+    def test_listing_request_rejects_unavailable_quantity_or_wrong_unit(self):
+        with self.sessions() as db:
+            db.add(ProduceInventory(
+                id=21, seller_id=1, produce_type="Tomato", variety="Roma",
+                quantity_available=2, unit="kg", price_per_unit=3.5,
+                location="Farm A", organic=False, is_available=True,
+            ))
+            db.commit()
+
+        too_much = self.client.post("/api/fulfillment/orders", json={
+            **self.payload, "produce_inventory_id": 21,
+            "menurithm_inventory_item_id": 8,
+        })
+        self.assertEqual(too_much.status_code, 409)
+        wrong_unit = self.client.post("/api/fulfillment/orders", json={
+            **self.payload, "quantity_needed": 1, "unit": "pieces",
+            "produce_inventory_id": 21, "menurithm_inventory_item_id": 8,
+        })
+        self.assertEqual(wrong_unit.status_code, 409)
 
     def test_legacy_status_endpoints_cannot_bypass_new_agreements(self):
         order = self.create()
@@ -207,6 +325,8 @@ class FulfillmentTests(unittest.TestCase):
         self.assertEqual(self.client.put(path + "/status", json={"status": "pending"}).status_code, 409)
         with self.sessions() as db:
             self.assertEqual(db.get(ProduceRequest, order["request_id"]).status, "completed")
+            self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 7)
+            self.assertFalse(db.get(FulfillmentAgreement, order["id"]).stock_reserved)
         self.assertEqual(self.client.put(f"/api/routes/{route_id}/status?status=completed").status_code, 200)
 
     def test_route_handover_guards_and_reconciliation_after_route_completion(self):

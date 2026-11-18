@@ -9,6 +9,7 @@ export interface ProduceInventory {
   produce_type: string;
   variety?: string;
   quantity_available: number;
+  quantity_committed: number;
   unit: string;
   price_per_unit: number;
   harvest_date?: string;
@@ -124,7 +125,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
 // Produce Inventory API
 export const produceInventoryApi = {
-  async create(inventory: Omit<ProduceInventory, 'id' | 'seller_id' | 'created_at' | 'updated_at' | 'is_available'>): Promise<ProduceInventory> {
+  async create(inventory: Omit<ProduceInventory, 'id' | 'seller_id' | 'created_at' | 'updated_at' | 'is_available' | 'quantity_committed'>): Promise<ProduceInventory> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/produce/inventory`, {
       method: 'POST',
@@ -153,7 +154,7 @@ export const produceInventoryApi = {
     return response.json();
   },
 
-  async update(id: number, updates: Partial<ProduceInventory>): Promise<ProduceInventory> {
+  async update(id: number, updates: Partial<ProduceInventory> & { expected_quantity_available?: number }): Promise<ProduceInventory> {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/produce/inventory/${id}`, {
       method: 'PUT',
@@ -162,7 +163,8 @@ export const produceInventoryApi = {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to update inventory: ${response.statusText}`);
+      const error = await response.json().catch(() => null);
+      throw new Error(typeof error?.detail === 'string' ? error.detail : `Failed to update inventory: ${response.statusText}`);
     }
     
     return response.json();
@@ -176,7 +178,8 @@ export const produceInventoryApi = {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to delete inventory: ${response.statusText}`);
+      const error = await response.json().catch(() => null);
+      throw new Error(typeof error?.detail === 'string' ? error.detail : `Failed to delete inventory: ${response.statusText}`);
     }
   }
 };
