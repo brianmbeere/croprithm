@@ -1,16 +1,19 @@
+import hashlib
 import hmac
 import os
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from app.db.database import get_db
 from app.models.user import User
 from app.models.produce import ProduceInventory, ProduceRequest
-from app.models.fulfillment import FulfillmentAgreement
+from app.models.fulfillment import FulfillmentAgreement, PickupCheckout, PickupWindow
 from app.utils.auth_dependency import verify_firebase_token
 from app.services.fulfillment import advance_handover, cancel_agreement, matching_listing, reserve_stock
 
@@ -27,13 +30,16 @@ class CartPreview(BaseModel):
     lines: list[CartLine] = Field(min_length=1, max_length=50)
 
 
-def build_cart_preview(data: CartPreview, db: Session):
+def build_cart_preview(data: CartPreview, db: Session, *, lock: bool = False):
     quantities = {line.listing_id: line.quantity for line in data.lines}
     if len(quantities) != len(data.lines):
         raise HTTPException(422, "Each listing can appear only once.")
-    listings = db.query(ProduceInventory).filter(
+    query = db.query(ProduceInventory).filter(
         ProduceInventory.id.in_(quantities), ProduceInventory.is_available.is_(True)
-    ).options(joinedload(ProduceInventory.seller)).all()
+    ).order_by(ProduceInventory.id)
+    if lock:
+        query = query.with_for_update()
+    listings = query.all()
     if len(listings) != len(quantities):
         raise HTTPException(409, "A listing is no longer available. Update your cart.")
     if len({listing.seller_id for listing in listings}) != 1:
@@ -49,6 +55,8 @@ def build_cart_preview(data: CartPreview, db: Session):
         if not price.is_finite() or not 0 <= price <= Decimal("99999999.99"):
             raise HTTPException(409, f"{listing.produce_type} has no valid posted price.")
         amount = (quantity * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if amount > Decimal("99999999.99"):
+            raise HTTPException(422, "A cart line exceeds the maximum order amount.")
         subtotal += amount
         lines.append({
             "listing_id": listing.id, "produce_type": listing.produce_type,
@@ -56,7 +64,7 @@ def build_cart_preview(data: CartPreview, db: Session):
             "unit_price": str(price), "line_total": str(amount),
         })
     return {
-        "seller_name": listings[0].seller.full_name, "currency": "USD",
+        "seller_id": listings[0].seller_id, "seller_name": listings[0].seller.full_name, "currency": "USD",
         "lines": lines, "produce_subtotal": str(subtotal),
         "payment_provider": "stripe_connect", "payment_status": "not_configured",
     }
@@ -140,6 +148,185 @@ def farmer(db: Session = Depends(get_db), claims: dict = Depends(verify_firebase
     return user
 
 
+class PickupWindowInput(BaseModel):
+    address: str = Field(min_length=1, max_length=500)
+    starts_at: datetime
+    ends_at: datetime
+
+    @model_validator(mode="after")
+    def validate_window(self):
+        self.address = self.address.strip()
+        if not self.address or self.starts_at.utcoffset() is None or self.ends_at.utcoffset() is None:
+            raise ValueError("Provide a pickup address and timezone-aware times.")
+        if not datetime.now(timezone.utc) < self.starts_at < self.ends_at:
+            raise ValueError("Pickup must start in the future and end after it starts.")
+        return self
+
+
+class PickupCheckoutInput(CartPreview):
+    window_id: int = Field(gt=0)
+    attempt_key: UUID
+    expected_subtotal: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    restaurant_name: str = Field(min_length=1, max_length=200)
+    customer_contact: str | None = Field(default=None, max_length=320)
+
+
+def utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def window_view(window: PickupWindow):
+    return {"id": window.id, "address": window.address, "starts_at": utc(window.starts_at),
+            "ends_at": utc(window.ends_at), "active": window.active}
+
+
+@router.get("/marketplace/farmer/pickup-windows")
+def seller_pickup_windows(user: User = Depends(farmer), db: Session = Depends(get_db)):
+    windows = db.query(PickupWindow).filter(
+        PickupWindow.seller_id == user.id, PickupWindow.ends_at > datetime.now(timezone.utc),
+    ).order_by(PickupWindow.starts_at).all()
+    return [window_view(window) for window in windows]
+
+
+@router.post("/marketplace/farmer/pickup-windows", status_code=201)
+def post_pickup_window(data: PickupWindowInput, user: User = Depends(farmer), db: Session = Depends(get_db)):
+    window = PickupWindow(seller_id=user.id, address=data.address, starts_at=utc(data.starts_at),
+                          ends_at=utc(data.ends_at), active=True)
+    db.add(window)
+    db.flush()
+    result = window_view(window)
+    db.commit()
+    return result
+
+
+@router.post("/marketplace/farmer/pickup-windows/{identifier}/pause")
+def pause_pickup_window(identifier: int, user: User = Depends(farmer), db: Session = Depends(get_db)):
+    window = db.query(PickupWindow).filter_by(id=identifier, seller_id=user.id).with_for_update().first()
+    if window is None:
+        raise HTTPException(404, "Pickup window not found.")
+    window.active = False
+    db.commit()
+    return window_view(window)
+
+
+def checkout_view(checkout: PickupCheckout):
+    return {"id": checkout.id, "state": checkout.state, "produce_subtotal": str(checkout.subtotal),
+            "currency": "USD", "payment_method": "pay_at_pickup"}
+
+
+def checkout_agreements(db: Session, checkout: PickupCheckout):
+    return db.query(FulfillmentAgreement).filter_by(pickup_checkout_id=checkout.id).order_by(
+        FulfillmentAgreement.produce_inventory_id
+    ).with_for_update().all()
+
+
+def cancel_pickup_checkout(db: Session, checkout: PickupCheckout, *, seller: bool):
+    if checkout.state == "canceled":
+        return
+    agreements = checkout_agreements(db, checkout)
+    cancellable = {"accepted", "ready"} if seller else {"accepted"}
+    if any(agreement.stage not in cancellable or agreement.payment_recorded_at is not None
+           for agreement in agreements):
+        raise HTTPException(409, "This pickup order can no longer be canceled here. Contact the other party.")
+    for agreement in agreements:
+        cancel_agreement(db, agreement, db.get(ProduceRequest, agreement.request_id))
+    checkout.state = "canceled"
+
+
+@router.post("/marketplace/pickup-checkouts")
+def start_pickup_checkout(data: PickupCheckoutInput, identity: str = Depends(customer_identity),
+                          db: Session = Depends(get_db)):
+    name = data.restaurant_name.strip()
+    if not name:
+        raise HTTPException(422, "Enter the restaurant name.")
+    fingerprint = hashlib.sha256(repr((
+        data.window_id, str(data.expected_subtotal.normalize()), name,
+        sorted((line.listing_id, str(line.quantity.normalize())) for line in data.lines),
+    )).encode()).hexdigest()
+    attempt = {"customer_identity": identity, "attempt_key": str(data.attempt_key)}
+    existing = db.query(PickupCheckout).filter_by(**attempt).first()
+    if existing is not None:
+        if existing.fingerprint != fingerprint:
+            raise HTTPException(409, "This checkout attempt belongs to a different cart.")
+        return checkout_view(existing)
+    window = db.query(PickupWindow).filter_by(id=data.window_id).with_for_update().first()
+    if window is None or not window.active or utc(window.starts_at) <= datetime.now(timezone.utc):
+        raise HTTPException(409, "Choose an available pickup window.")
+    # Claim the attempt before locking stock, so a concurrent retry cannot reserve a second time.
+    checkout = PickupCheckout(**attempt, fingerprint=fingerprint, window_id=window.id,
+                              subtotal=data.expected_subtotal, state="placed")
+    db.add(checkout)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(PickupCheckout).filter_by(**attempt).one_or_none()
+        if existing is None:
+            raise
+        if existing.fingerprint != fingerprint:
+            raise HTTPException(409, "This checkout attempt belongs to a different cart.")
+        return checkout_view(existing)
+    cart = build_cart_preview(data, db, lock=True)
+    if cart["seller_id"] != window.seller_id:
+        raise HTTPException(409, "Choose a pickup window from the farm in your cart.")
+    if Decimal(cart["produce_subtotal"]) != data.expected_subtotal:
+        raise HTTPException(409, "The produce subtotal changed. Review your cart again.")
+    now = datetime.now(timezone.utc)
+    if utc(window.starts_at) <= now:
+        raise HTTPException(409, "Choose an available pickup window.")
+    local_user = db.query(User).filter_by(firebase_uid=identity.removeprefix("croprithm:")).first() if identity.startswith("croprithm:") else None
+    for line in cart["lines"]:
+        order = ProduceRequest(
+            restaurant_id=local_user.id if local_user else None,
+            restaurant_name=name, produce_type=line["produce_type"], unit=line["unit"],
+            quantity_needed=float(line["quantity"]), delivery_address="",
+            delivery_window_start=window.starts_at, delivery_window_end=window.ends_at,
+            status="accepted", assigned_seller_id=window.seller_id,
+        )
+        db.add(order)
+        db.flush()
+        agreement = FulfillmentAgreement(
+            request_id=order.id, pickup_checkout_id=checkout.id, customer_identity=identity,
+            customer_contact=local_user.email if local_user else data.customer_contact,
+            method="customer_pickup", pickup_address=window.address, fee=Decimal(0),
+            produce_total=Decimal(line["line_total"]), currency="USD", revision=1, stage="accepted",
+            accepted_revision=1, accepted_at=now,
+            produce_inventory_id=line["listing_id"],
+        )
+        reserve_stock(db, agreement, order)
+        db.add(agreement)
+    result = checkout_view(checkout)
+    db.commit()
+    return result
+
+
+@router.post("/marketplace/pickup-checkouts/{identifier}/cancel")
+def cancel_customer_pickup(identifier: int, identity: str = Depends(customer_identity), db: Session = Depends(get_db)):
+    checkout = db.query(PickupCheckout).filter_by(
+        id=identifier, customer_identity=identity,
+    ).with_for_update().first()
+    if checkout is None:
+        raise HTTPException(404, "Checkout not found.")
+    cancel_pickup_checkout(db, checkout, seller=False)
+    result = checkout_view(checkout)
+    db.commit()
+    return result
+
+
+@router.post("/marketplace/farmer/pickup-checkouts/{identifier}/cancel")
+def cancel_farmer_pickup(identifier: int, user: User = Depends(farmer), db: Session = Depends(get_db)):
+    checkout = db.query(PickupCheckout).filter(
+        PickupCheckout.id == identifier,
+        PickupCheckout.window_id.in_(db.query(PickupWindow.id).filter_by(seller_id=user.id)),
+    ).with_for_update().first()
+    if checkout is None:
+        raise HTTPException(404, "Pickup order not found.")
+    cancel_pickup_checkout(db, checkout, seller=True)
+    result = checkout_view(checkout)
+    db.commit()
+    return result
+
+
 def serialize(agreement: FulfillmentAgreement, order: ProduceRequest) -> dict:
     seller = order.assigned_seller
     return {
@@ -153,6 +340,7 @@ def serialize(agreement: FulfillmentAgreement, order: ProduceRequest) -> dict:
         "sale_total": str(agreement.produce_total + agreement.fee)
         if agreement.produce_total is not None and agreement.fee is not None else None,
         "stock_reserved": agreement.stock_reserved,
+        "pickup_checkout_id": agreement.pickup_checkout_id,
         "payment_recorded_at": agreement.payment_recorded_at,
         "currency": agreement.currency, "pickup_address": agreement.pickup_address,
         "instructions": agreement.instructions, "revision": agreement.revision,
@@ -179,7 +367,13 @@ def customer_order(db: Session, identity: str, identifier: int):
 
 @router.post("/marketplace/checkout-preview")
 def preview_checkout(data: CartPreview, _identity: str = Depends(customer_identity), db: Session = Depends(get_db)):
-    return build_cart_preview(data, db)
+    cart = build_cart_preview(data, db)
+    windows = db.query(PickupWindow).filter(
+        PickupWindow.seller_id == cart["seller_id"], PickupWindow.active.is_(True),
+        PickupWindow.starts_at > datetime.now(timezone.utc),
+    ).order_by(PickupWindow.starts_at).limit(50).all()
+    cart.update(payment_method="pay_at_pickup", pickup_windows=[window_view(window) for window in windows])
+    return cart
 
 
 @router.get("/produce/available")
@@ -391,6 +585,8 @@ def update_stage(identifier: int, data: StageInput, user: User = Depends(farmer)
 @router.post("/orders/{identifier}/cancel")
 def cancel_customer_order(identifier: int, identity: str = Depends(customer_identity), db: Session = Depends(get_db)):
     agreement, order = customer_order(db, identity, identifier)
+    if agreement.pickup_checkout_id is not None:
+        raise HTTPException(409, "Cancel the entire pickup order instead.")
     cancel_agreement(db, agreement, order)
     db.commit()
     return serialize(agreement, order)
@@ -409,6 +605,8 @@ def seller_order(db: Session, identifier: int, seller_id: int):
 @router.post("/farmer/orders/{identifier}/cancel")
 def cancel_farmer_order(identifier: int, user: User = Depends(farmer), db: Session = Depends(get_db)):
     agreement, order = seller_order(db, identifier, user.id)
+    if agreement.pickup_checkout_id is not None:
+        raise HTTPException(409, "Cancel the entire pickup order instead.")
     cancel_agreement(db, agreement, order)
     db.commit()
     return serialize(agreement, order)

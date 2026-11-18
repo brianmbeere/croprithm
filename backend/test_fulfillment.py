@@ -1,7 +1,8 @@
 import os
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -78,6 +79,60 @@ class FulfillmentTests(unittest.TestCase):
 
     def stage(self, order, stage):
         return self.client.put(f"/api/fulfillment/farmer/orders/{order['id']}/stage", json={"stage": stage})
+
+    def test_pay_at_pickup_places_once_and_handover_does_not_deduct_twice(self):
+        windows = "/api/fulfillment/marketplace/farmer/pickup-windows"
+        checkouts = "/api/fulfillment/marketplace/pickup-checkouts"
+        preview = "/api/fulfillment/marketplace/checkout-preview"
+        now = datetime.now(timezone.utc)
+        payload = {"address": "Farm gate", "starts_at": (now + timedelta(hours=1)).isoformat(),
+                   "ends_at": (now + timedelta(hours=2)).isoformat()}
+        posted = self.client.post(windows, json=payload)
+        self.assertEqual(posted.status_code, 201, posted.text)
+        window_id = posted.json()["id"]
+        lines = [{"listing_id": 10, "quantity": "3"}]
+        self.assertEqual(self.client.post(preview, json={"lines": lines}).json()["pickup_windows"][0]["id"], window_id)
+        cart = {"lines": lines, "window_id": window_id, "restaurant_name": "Kitchen",
+                "expected_subtotal": "10.50", "attempt_key": str(uuid4())}
+        self.assertEqual(self.client.post(checkouts, json={**cart, "expected_subtotal": "10.49"}).status_code, 409)
+        response = self.client.post(checkouts, json=cart)
+        self.assertEqual(response.status_code, 200, response.text)
+        checkout = response.json()
+        self.assertEqual((checkout["state"], checkout["payment_method"]), ("placed", "pay_at_pickup"))
+        self.assertEqual(self.client.post(checkouts, json=cart).json(), checkout)
+        self.assertEqual(self.client.post(checkouts, json={**cart, "restaurant_name": "Different"}).status_code, 409)
+        self.assertEqual(self.client.post(f"{windows}/{window_id}/pause").status_code, 200)
+        self.assertEqual(self.client.post(checkouts, json={**cart, "attempt_key": str(uuid4())}).status_code, 409)
+        order, = self.client.get("/api/fulfillment/farmer/orders").json()
+        self.assertEqual((order["pickup_checkout_id"], order["stage"], order["payment_recorded_at"]), (checkout["id"], "accepted", None))
+        inventory = self.client.get("/api/produce/inventory").json()[0]
+        self.assertEqual((inventory["quantity_available"], inventory["quantity_committed"]), (7, 3))
+        path = f"{checkouts}/{checkout['id']}/cancel"
+        self.identity = "menurithm:other"
+        self.assertEqual(self.client.post(path).status_code, 404)
+        self.identity = "menurithm:customer-one"
+        self.assertEqual(self.stage(order, "ready").status_code, 200)
+        self.assertEqual(self.client.post(path).status_code, 409)
+        self.assertEqual(self.stage(order, "collected").status_code, 200)
+        self.assertEqual(self.client.post(f"/api/fulfillment/farmer/orders/{order['id']}/record-payment").status_code, 200)
+        inventory = self.client.get("/api/produce/inventory").json()[0]
+        self.assertEqual((inventory["quantity_available"], inventory["quantity_committed"]), (7, 0))
+
+    def test_pickup_cancel_releases_stock_once(self):
+        now = datetime.now(timezone.utc)
+        posted = self.client.post("/api/fulfillment/marketplace/farmer/pickup-windows", json={
+            "address": "Farm gate", "starts_at": (now + timedelta(hours=1)).isoformat(),
+            "ends_at": (now + timedelta(hours=2)).isoformat(),
+        })
+        endpoint = "/api/fulfillment/marketplace/pickup-checkouts"
+        cart = {"lines": [{"listing_id": 10, "quantity": "3"}], "window_id": posted.json()["id"],
+                "restaurant_name": "Kitchen", "expected_subtotal": "10.50", "attempt_key": str(uuid4())}
+        placed = self.client.post(endpoint, json=cart)
+        self.assertEqual(placed.status_code, 200, placed.text)
+        for _ in range(2):
+            self.assertEqual(self.client.post(f"{endpoint}/{placed.json()['id']}/cancel").json()["state"], "canceled")
+        with self.sessions() as db:
+            self.assertEqual(db.get(ProduceInventory, 10).quantity_available, 10)
 
     def test_delivery_requires_exact_customer_acceptance_and_preserves_fee(self):
         order = self.create()

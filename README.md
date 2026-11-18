@@ -42,20 +42,32 @@ physical handover. Explicit confirmation atomically updates the agreement,
 customer order and route stop, just like the action in **Orders & handovers**.
 Ordinary route progress and legacy **Mark delivered** do not confirm an order.
 
-### Backend setup and deployment order
+### Pay-at-pickup checkout
 
 The **Farm storefront** shows listing status and committed stock. Menurithm's
 checkout preview reads published stock and posted prices from Croprithm and
 reviews one farm's cart at a time. It does not create orders or reserve stock.
-Stripe Connect onboarding, checkout, refunds, and delayed transfers are not
-configured. Instant checkout also requires posted fulfillment windows and
-expiring stock reservations; keep the quote flow available for real orders.
+
+In **Orders & handovers**, choose **Manage pickup windows** to publish a
+future pickup window for in-stock listings. A window is a pickup time range,
+not a capacity limit. Restaurants can place a one-farm order at posted prices
+without farmer approval and pay the farmer directly at pickup. The cart does
+not hold stock until the order is placed. Order lines use the existing
+ready/collected flow and allow payment to be recorded after collection.
+Checkout does not collect online payments or calculate taxes or platform fees.
+
+Pausing a window prevents new orders without changing existing orders.
+Buyers can cancel the full order before any item is ready; farmers can cancel
+before any item is collected. Cancellation releases the committed stock.
+Missed pickups do not auto-cancel; farmers can cancel them to restock.
+
+### Backend setup and deployment order
 
 1. Back up the Croprithm logical database (internally named `routecast`).
 2. From `backend`, with its own `DATABASE_URL` / `DB_NAME`, run
    `python migrate_fulfillment.py`. This idempotently creates or adds the
    fulfillment agreement fields for listing and kitchen links, pricing,
-   reservations and payment records; it does not modify existing order columns
+   reservations and payment records, and pickup checkout tables; it does not modify existing order columns
    or the Menurithm logical database. `create_all` is not a column migration.
 3. Generate a strong random `FULFILLMENT_BRIDGE_KEY`. Set the **same value only
    on both API services**, never in a `VITE_*` variable, Git or browser storage.

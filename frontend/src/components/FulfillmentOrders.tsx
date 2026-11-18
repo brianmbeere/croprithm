@@ -8,6 +8,7 @@ import { BASE_URL } from '../utils';
 import { produceInventoryApi, type ProduceInventory } from '../api/produceApi';
 
 interface Order {
+  pickup_checkout_id?: number | null;
   id: number; request_id: number; restaurant_name: string; produce_type: string;
   quantity_needed: number; unit: string; method: string; fee: string | null;
   currency: string; pickup_address: string | null; instructions: string | null;
@@ -17,6 +18,7 @@ interface Order {
   produce_inventory_id: number | null; produce_total: string | null; sale_total: string | null;
   stock_reserved: boolean; payment_recorded_at: string | null; seller_id: number | null;
 }
+type PickupWindow = { id: number; address: string; starts_at: string; ends_at: string; active: boolean };
 interface Quote {
   method: string; fee: string; pickup_address: string; instructions: string;
   produce_total: string; produce_inventory_id: number | '';
@@ -41,6 +43,29 @@ export default function FulfillmentOrders() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [windows, setWindows] = useState<PickupWindow[]>([]);
+  const [windowForm, setWindowForm] = useState({ address: '', starts_at: '', ends_at: '' });
+  const [showWindows, setShowWindows] = useState(false);
+  const windowPath = 'marketplace/farmer/pickup-windows';
+
+  const manageWindows = async (action: 'load' | 'post' | number) => {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      if (action === 'post') {
+        await request<PickupWindow>(windowPath, { method: 'POST', body: JSON.stringify({
+          address: windowForm.address, starts_at: new Date(windowForm.starts_at).toISOString(),
+          ends_at: new Date(windowForm.ends_at).toISOString(),
+        }) });
+        setWindowForm({ address: '', starts_at: '', ends_at: '' });
+      } else if (typeof action === 'number') {
+        await request<PickupWindow>(`${windowPath}/${action}/pause`, { method: 'POST' });
+      }
+      setWindows(await request<PickupWindow[]>(windowPath));
+      setShowWindows(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update pickup windows.');
+    } finally { setBusy(false); }
+  };
   const refresh = async () => {
     setLoading(true); setError('');
     try {
@@ -82,12 +107,18 @@ export default function FulfillmentOrders() {
 
   const closeOrder = async (order: Order, action: 'cancel' | 'record-payment') => {
     if (!window.confirm(action === 'cancel'
-      ? 'Cancel this order and release any reserved stock?'
+      ? order.pickup_checkout_id ? 'Cancel all items in this pickup order?' : 'Cancel this order and release any reserved stock?'
       : `Confirm you received USD ${order.sale_total} directly from the customer?`)) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const updated = await request<Order>(`farmer/orders/${order.id}/${action}`, { method: 'POST' });
-      setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
+      if (order.pickup_checkout_id && action === 'cancel') {
+        await request(`marketplace/farmer/pickup-checkouts/${order.pickup_checkout_id}/cancel`, { method: 'POST' });
+        setOrders(previous => previous.map(item => item.pickup_checkout_id === order.pickup_checkout_id
+          ? { ...item, stage: 'canceled', stock_reserved: false } : item));
+      } else {
+        const updated = await request<Order>(`farmer/orders/${order.id}/${action}`, { method: 'POST' });
+        setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
+      }
       setNotice(action === 'cancel' ? 'Order canceled. Any reserved stock was released.' : 'Direct payment recorded.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update the order.');
@@ -104,6 +135,31 @@ export default function FulfillmentOrders() {
       <Alert severity="info">Quote produce and delivery in USD. Stock is reserved when the customer accepts. Collect payment directly, then record it here after handover. Croprithm does not process payments.</Alert>
       {error && <Alert severity="error" role="alert">{error}</Alert>}
       {notice && <Alert severity="success" role="status">{notice}</Alert>}
+      <Box><Button variant="outlined" disabled={busy} onClick={() => void manageWindows('load')}>Manage pickup windows</Button></Box>
+      {showWindows && <Card variant="outlined"><CardContent><Stack spacing={2}>
+        <Typography variant="h6">Pickup windows</Typography>
+        <Typography variant="body2">Posting a window lets restaurants order your published, in-stock listings at their posted prices and pay you at pickup. A window can serve multiple orders. Pausing it stops new orders without changing existing ones.</Typography>
+        <Stack component="form" spacing={2} onSubmit={event => { event.preventDefault(); void manageWindows('post'); }}>
+          <TextField required label="Pickup address" value={windowForm.address}
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+            onChange={event => {
+              const value = (event.target as HTMLInputElement).value;
+              setWindowForm(previous => ({ ...previous, address: value }));
+            }} />
+          {(['starts_at', 'ends_at'] as const).map(field => <TextField key={field} required type="datetime-local"
+            label={field === 'starts_at' ? 'Starts (local time)' : 'Ends (local time)'} value={windowForm[field]}
+            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={event => {
+              const value = (event.target as HTMLInputElement).value;
+              setWindowForm(previous => ({ ...previous, [field]: value }));
+            }} />)}
+          <Button type="submit" variant="contained" disabled={busy}>Post pickup window</Button>
+        </Stack>
+        {windows.map(window => <Stack key={window.id} direction={{ xs: 'column', sm: 'row' }} gap={1} alignItems={{ sm: 'center' }}>
+          <Typography>{new Date(window.starts_at).toLocaleString()} to {new Date(window.ends_at).toLocaleString()} / {window.address}</Typography>
+          {window.active ? <Button disabled={busy} onClick={() => void manageWindows(window.id)}>Pause</Button> : <Chip label="Paused" />}
+        </Stack>)}
+      </Stack></CardContent></Card>}
       <Box><Button variant="outlined" disabled={loading || busy} onClick={refresh}>Refresh orders</Button></Box>
       {loading ? <CircularProgress aria-label="Loading orders" /> : orders.length === 0 && !error ?
         <Card><CardContent><Typography variant="h6">Your next harvest starts here</Typography><Typography color="text.secondary">New customer requests will appear here. Keep your produce inventory current while you wait.</Typography></CardContent></Card> : null}
@@ -176,11 +232,17 @@ export default function FulfillmentOrders() {
             </>}
             {order.sale_total != null && <Typography>Produce: USD {order.produce_total} · Delivery: USD {order.fee} · Total: USD {order.sale_total}</Typography>}
             {order.stock_reserved && <Chip sx={{ alignSelf: 'flex-start' }} label="Stock committed" color="success" />}
+            {order.pickup_checkout_id && <Chip sx={{ alignSelf: 'flex-start' }} label={`Pickup #${order.pickup_checkout_id} · Pay at pickup`} />}
             {order.payment_recorded_at && <Alert severity="success">Direct payment recorded {new Date(order.payment_recorded_at).toLocaleString()}.</Alert>}
             {completed && order.sale_total != null && !order.payment_recorded_at && <Button sx={{ alignSelf: 'flex-start' }}
-              variant="contained" disabled={busy} onClick={() => void closeOrder(order, 'record-payment')}>Record direct payment</Button>}
-            {order.seller_id && !completed && order.stage !== 'canceled' && <Button sx={{ alignSelf: 'flex-start' }}
-              color="error" disabled={busy} onClick={() => void closeOrder(order, 'cancel')}>Cancel order</Button>}
+              variant="contained" disabled={busy} onClick={() => void closeOrder(order, 'record-payment')}>
+                {order.pickup_checkout_id ? 'Record payment for this item' : 'Record direct payment'}
+              </Button>}
+            {order.seller_id && !completed && order.stage !== 'canceled'
+              && (!order.pickup_checkout_id || orders.every(item => item.pickup_checkout_id !== order.pickup_checkout_id || ['accepted', 'ready'].includes(item.stage)))
+              && <Button sx={{ alignSelf: 'flex-start' }} color="error" disabled={busy} onClick={() => void closeOrder(order, 'cancel')}>
+                {order.pickup_checkout_id ? 'Cancel entire pickup order' : 'Cancel order'}
+              </Button>}
           </Stack>
         </CardContent></Card>;
       })}

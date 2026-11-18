@@ -22,6 +22,11 @@ All routes below are rooted at `/api/fulfillment`.
 | GET | `/orders` | Customer's own orders and current agreement terms only |
 | GET | `/produce/available` | Authenticated Menurithm bridge: current available listings with farmer, quantity, unit, price and location; optional `produce_type`, `location` and `max_price` filters |
 | POST | `/marketplace/checkout-preview` | Authenticated customer: supply `lines` with distinct `listing_id` and positive decimal `quantity` (up to three fractional places). Rechecks one farm's published stock and prices. Returns the produce subtotal and `payment_status: "not_configured"`; no writes or Stripe calls. |
+| GET / POST | `/marketplace/farmer/pickup-windows` | Farmer: list own current windows or post an address and future timezone-aware `starts_at` / `ends_at`. |
+| POST | `/marketplace/farmer/pickup-windows/{id}/pause` | Farmer: stop new orders for an owned window. |
+| POST | `/marketplace/pickup-checkouts` | Customer: place `lines` for the selected `window_id` with an `attempt_key` UUID, `expected_subtotal` and `restaurant_name`. Identical retries return the same checkout. |
+| POST | `/marketplace/pickup-checkouts/{id}/cancel` | Customer: cancel the whole order before any item is ready. |
+| POST | `/marketplace/farmer/pickup-checkouts/{id}/cancel` | Farmer: cancel the whole order before any item is collected. |
 | POST | `/orders/{id}/accept` | Customer: `{"revision": 1}` accepts the exact quote and reserves available stock; stale revisions or insufficient stock return 409 |
 | POST | `/orders/{id}/cancel` | Customer: cancel own order before handover and release any reservation |
 | GET | `/farmer/orders` | Farmer: unassigned and own orders |
@@ -41,6 +46,11 @@ Menurithm may include `produce_inventory_id` and its own
 not reserve it. Acceptance reserves stock once and handover consumes that
 reservation without a second deduction. Menurithm adds produce to kitchen stock only after the restaurant
 confirms the actual received quantity.
+
+Marketplace routes use their own window or checkout IDs. Cart preview returns
+upcoming `pickup_windows` for the farm. Checkout responses include `state`,
+`produce_subtotal`, and `payment_method: "pay_at_pickup"`. No Stripe calls are
+made. Agreement responses include `pickup_checkout_id` for grouped orders.
 
 Farmer `GET /api/produce/inventory` returns `quantity_available` (uncommitted
 stock) and `quantity_committed`; their sum represents on-hand stock. A
