@@ -2,6 +2,10 @@
 
 ## Landing page
 
+The public landing page includes a silent, 28-second farmer walkthrough
+recorded with sample data. The MP4 and poster live in `frontend/public/demo/`;
+update the on-page transcript when replacing the walkthrough.
+
 The public homepage introduces the farmer workflow and links to sign-in,
 farmer registration, and the Menurithm produce marketplace. The restaurant
 section shows a labeled example listing, not live inventory, and the FAQ

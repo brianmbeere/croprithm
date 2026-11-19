@@ -178,6 +178,31 @@
   object-fit: cover;
 }
 
+.crop-product-demo {
+  max-width: 920px;
+  padding-block: 0 3rem;
+  scroll-margin-top: 1rem;
+}
+
+.crop-product-demo video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin: 1rem 0;
+  border-radius: 1rem;
+  background: #103f2b;
+}
+
+.crop-product-demo summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.crop-product-demo details {
+  margin-bottom: 0.75rem;
+}
+
 .crop-workflow {
   padding-block: clamp(36px, 6vw, 72px);
   background: #edf1e8;

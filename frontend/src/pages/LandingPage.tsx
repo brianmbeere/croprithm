@@ -58,6 +58,7 @@ export default function LandingPage() {
             <div className="crop-actions">
               <a className="crop-button crop-button-primary" href="/signup">Create a farmer account <span aria-hidden="true">→</span></a>
               <a className="crop-text-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
+              <a className="crop-text-link" href="#product-demo">Watch the 28-second demo</a>
             </div>
             <a className="crop-buyer-shortcut crop-text-link" href="#for-restaurants">Buying for a restaurant? <span aria-hidden="true">↓</span></a>
           </div>
@@ -65,6 +66,25 @@ export default function LandingPage() {
             <img src="/farm-to-kitchen.svg" width="720" height="570" fetchPriority="high"
               alt="Illustration of a crate of fresh vegetables in front of rolling farm fields" />
           </figure>
+        </section>
+
+        <section className="crop-shell crop-product-demo" id="product-demo" aria-labelledby="crop-demo-title">
+          <p className="crop-eyebrow">Product demo</p>
+          <h2 id="crop-demo-title">See Croprithm in action</h2>
+          <p>From tracking your harvest to planning deliveries. A 28-second walkthrough with sample data and no audio.</p>
+          <video controls controlsList="nodownload" playsInline preload="none" width={1280} height={720}
+            poster="/demo/croprithm-walkthrough.jpg" aria-label="Croprithm product walkthrough">
+            <source src="/demo/croprithm-walkthrough.mp4" type="video/mp4" />
+          </video>
+          <details>
+            <summary>Read the walkthrough</summary>
+            <ol>
+              <li>See what is on hand, available to sell, and committed to orders.</li>
+              <li>Set a price, unit, and available quantity for a listing on Menurithm.</li>
+              <li>Check what to pack, who ordered it, and when it needs to be ready.</li>
+              <li>Organize confirmed deliveries and open Google Maps or Apple Maps for directions.</li>
+            </ol>
+          </details>
         </section>
 
         <section className="crop-workflow" id="how-it-works" aria-labelledby="crop-workflow-title">
